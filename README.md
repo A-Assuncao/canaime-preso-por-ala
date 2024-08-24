@@ -87,14 +87,14 @@ canaime-preso-por-ala/
 
 1. Faça um fork do projeto.
 
-2. Crie uma branch para sua feature (git checkout -b feature/SuaFeature).
+2. Crie uma branch para sua feature (`git checkout -b feature/SuaFeature`).
 
-3. Commit suas mudanças (git commit -m 'Adiciona a SuaFeature').
+3. Commit suas mudanças (`git commit -m 'Adiciona a SuaFeature'`).
 
-4. Faça um push para a branch (git push origin feature/SuaFeature).
+4. Faça um push para a branch (`git push origin feature/SuaFeature`).
 
 5. Abra um Pull Request.
 
 ## Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENÇA](#LICENCE) para mais detalhes.
+Este projeto está sob a licença MIT. Veja o arquivo [LICENÇA](LICENCE) para mais detalhes.
