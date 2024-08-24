@@ -97,4 +97,4 @@ canaime-preso-por-ala/
 
 ## Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENÇA](LICENCE) para mais detalhes.
+Este projeto está sob a licença MIT. Veja o arquivo [LICENÇA](LICENSE) para mais detalhes.
