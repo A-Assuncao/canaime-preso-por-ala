@@ -15,7 +15,7 @@ import updater
 from unit_selector import select_units_and_login
 
 
-current_version = 'v0.0.1'  # Versão atual do aplicativo
+current_version = 'v0.0.2'  # Versão atual do aplicativo
 
 url_login_canaime = 'https://canaime.com.br/sgp2rr/login/login_principal.php'
 url_reports = "https://canaime.com.br/sgp2rr/areas/unidades/Informes_LER.php?id_cad_preso="
