@@ -73,29 +73,28 @@ O projeto inclui um sistema de atualização automática. Ele verifica se há no
 
 ## Estrutura do Projeto
 
-```canaime_preso_por_ala/
+```canaime-preso-por-ala/
 │
-├── main.py
-├── gui/
-│   ├── __init__.py
-│   ├── login_canaime.py
-│   ├── unit_selector.py
+├── main.py                   # Arquivo principal que inicia a aplicação
+├── requirements.txt          # Dependências do projeto (se aplicável)
+├── README.md                 # Documentação do projeto
+│
+├── config/
+│   ├── units_config.json     # Arquivo de configuração das unidades
+│   └── config_loader.py      # Script para carregar e ler a configuração
 │
 ├── services/
-│   ├── __init__.py
-│   ├── logger_service.py
-│   ├── report_service.py
-│   ├── canaime_service.py
+│   ├── report_service.py     # Serviço para geração de relatórios em Excel
+│   ├── canaime_service.py    # Serviço específico para interações com o sistema Canaimé
 │
-├── utils/
-│   ├── __init__.py
-│   ├── updater.py
+├── gui/
+│   ├── login_canaime.py      # Interface de login
+│   └── unit_selector.py      # Interface de seleção de unidades
 │
-├── data/
-│   ├── __init__.py
-│   ├── data_processor.py
-│
-└── README.md
+└── utils/
+    ├── logger.py             # Utilitário para logging de erros
+    └── updater.py            # Utilitário para atualização do aplicativo
+
 
 ```
 
