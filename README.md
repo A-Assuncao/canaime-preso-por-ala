@@ -73,14 +73,30 @@ O projeto inclui um sistema de atualização automática. Ele verifica se há no
 
 ## Estrutura do Projeto
 
-```plaintext
-canaime-preso-por-ala/
+```canaime_preso_por_ala/
 │
-├── main.py                # Script principal para coleta de dados e geração de relatórios
-├── unit_selector.py       # Script que cria a interface gráfica para seleção de unidades e login
-├── updater.py             # Script para gerenciar atualizações automáticas do software
-├── requirements.txt       # Lista de dependências do projeto
-└── README.md              # Documentação do projeto
+├── main.py
+├── gui/
+│   ├── __init__.py
+│   ├── login_canaime.py
+│   ├── unit_selector.py
+│
+├── services/
+│   ├── __init__.py
+│   ├── logger_service.py
+│   ├── report_service.py
+│   ├── canaime_service.py
+│
+├── utils/
+│   ├── __init__.py
+│   ├── updater.py
+│
+├── data/
+│   ├── __init__.py
+│   ├── data_processor.py
+│
+└── README.md
+
 ```
 
 ## Contribuição
