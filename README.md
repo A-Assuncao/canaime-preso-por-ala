@@ -90,8 +90,8 @@ Abaixo está a estrutura atualizada do projeto:
 ├── 📂 gui                # Interface gráfica com o usuário (login e seleção de unidades)
 │   ├── 📂 login                # Componentes relacionados ao login
 │   │   └── login_canaime.py    # Tela de login para o sistema Canaimé
-│   ├── 📂 selectors            # Componentes de seleção
-│   │   └── unit_selector.py    # Seleção de unidades para geração de relatório
+│   └── 📂 selectors            # Componentes de seleção
+│       └── unit_selector.py    # Seleção de unidades para geração de relatório
 │
 ├── 📂 services           # Serviços de integração com Canaimé e geração de relatórios
 │   ├── canaime_service.py      # Realiza o login no sistema Canaimé
@@ -101,8 +101,6 @@ Abaixo está a estrutura atualizada do projeto:
 ├── 📂 utils              # Utilitários do sistema
 │   ├── logger.py              # Captura erros e gera logs
 │   └── updater.py             # Verifica atualizações da aplicação
-│
-├── 📂 venv               # Ambiente virtual (não incluído no GitHub)
 │
 ├── .gitignore            # Arquivos e pastas ignoradas pelo Git
 ├── LICENSE               # Licença do projeto
