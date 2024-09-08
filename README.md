@@ -73,7 +73,7 @@ O projeto inclui um sistema de atualização automática. Ele verifica se há no
 
 ## Estrutura do Projeto
 
-Abaixo está a estrutura de pastas e arquivos do projeto:
+Abaixo está a estrutura atualizada do projeto:
 
 ```
 📦 canaime-preso-por-ala
@@ -85,10 +85,13 @@ Abaixo está a estrutura de pastas e arquivos do projeto:
 │
 ├── 📂 data               # Manipulação e processamento de dados
 │   ├── data_processor.py       # Processa e formata os dados extraídos
+│   └── 📂 processed           # Armazenar dados gerados em tempo de execução
 │
 ├── 📂 gui                # Interface gráfica com o usuário (login e seleção de unidades)
-│   ├── login_canaime.py        # Tela de login para o sistema Canaimé
-│   └── unit_selector.py        # Seleção de unidades para geração de relatório
+│   ├── 📂 login                # Componentes relacionados ao login
+│   │   └── login_canaime.py    # Tela de login para o sistema Canaimé
+│   ├── 📂 selectors            # Componentes de seleção
+│   │   └── unit_selector.py    # Seleção de unidades para geração de relatório
 │
 ├── 📂 services           # Serviços de integração com Canaimé e geração de relatórios
 │   ├── canaime_service.py      # Realiza o login no sistema Canaimé
