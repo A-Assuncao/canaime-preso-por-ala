@@ -73,29 +73,39 @@ O projeto inclui um sistema de atualização automática. Ele verifica se há no
 
 ## Estrutura do Projeto
 
-```canaime-preso-por-ala/
-│
-├── main.py                   # Arquivo principal que inicia a aplicação
-├── requirements.txt          # Dependências do projeto (se aplicável)
-├── README.md                 # Documentação do projeto
-│
-├── config/
-│   ├── units_config.json     # Arquivo de configuração das unidades
-│   └── config_loader.py      # Script para carregar e ler a configuração
-│
-├── services/
-│   ├── report_service.py     # Serviço para geração de relatórios em Excel
-│   ├── canaime_service.py    # Serviço específico para interações com o sistema Canaimé
-│
-├── gui/
-│   ├── login_canaime.py      # Interface de login
-│   └── unit_selector.py      # Interface de seleção de unidades
-│
-└── utils/
-    ├── logger.py             # Utilitário para logging de erros
-    └── updater.py            # Utilitário para atualização do aplicativo
+Abaixo está a estrutura de pastas e arquivos do projeto:
 
-
+```
+📦 canaime-preso-por-ala
+│
+├── 📂 config             # Arquivos de configuração e geração de planilhas
+│   ├── excel_config_control.py  # Configurações da aba 'Controle' do Excel
+│   ├── excel_config_sei.py      # Configurações da aba 'SEI' do Excel
+│   └── units_config.json        # Configurações das unidades e alas
+│
+├── 📂 data               # Manipulação e processamento de dados
+│   ├── data_processor.py       # Processa e formata os dados extraídos
+│
+├── 📂 gui                # Interface gráfica com o usuário (login e seleção de unidades)
+│   ├── login_canaime.py        # Tela de login para o sistema Canaimé
+│   └── unit_selector.py        # Seleção de unidades para geração de relatório
+│
+├── 📂 services           # Serviços de integração com Canaimé e geração de relatórios
+│   ├── canaime_service.py      # Realiza o login no sistema Canaimé
+│   ├── playwright_service.py   # Executa tarefas usando Playwright
+│   └── report_service.py       # Gera relatórios Excel com base nos dados extraídos
+│
+├── 📂 utils              # Utilitários do sistema
+│   ├── logger.py              # Captura erros e gera logs
+│   └── updater.py             # Verifica atualizações da aplicação
+│
+├── 📂 venv               # Ambiente virtual (não incluído no GitHub)
+│
+├── .gitignore            # Arquivos e pastas ignoradas pelo Git
+├── LICENSE               # Licença do projeto
+├── main.py               # Arquivo principal da aplicação
+├── README.md             # Este arquivo
+└── requirements.txt      # Lista de dependências do projeto
 ```
 
 ## Contribuição
