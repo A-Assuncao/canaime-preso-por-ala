@@ -17,8 +17,8 @@ def get_shift_name():
     Retorna o nome do plantão com base na data atual.
     Ciclo de plantões: ALFA, BRAVO, CHARLIE, DELTA.
     """
-    base_date = datetime(2024, 1, 1)  # Data de referência
-    shifts = ['ALFA', 'BRAVO', 'CHARLIE', 'DELTA']
+    base_date = datetime(2024, 1, 1)  # Data de referência (1º de janeiro foi CHARLIE)
+    shifts = ['CHARLIE', 'DELTA', 'ALFA', 'BRAVO']  # Começando por CHARLIE
     current_date = datetime.now()
     delta_days = (current_date - base_date).days
     shift_name = shifts[delta_days % len(shifts)]
@@ -160,7 +160,7 @@ def fill_control_sheet(ws, data):
     ws['B15'] = '=W33'
     ws['B16'] = '=Y33'
     ws['B17'] = '=AA33'
-    ws['B18'] = '=SUM(B9:B17)'
+    ws['B18'] = '=SUM(B11:B17)'
     ws['B24'] = '=SUM(B19:B23)'
     ws['B30'] = '=SUM(B25:B28)'
     ws['B35'] = '=SUM(B8,B18,B24)'
