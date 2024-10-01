@@ -139,8 +139,12 @@ if __name__ == '__main__':
 
     multiprocessing.freeze_support()
 
-    logger.info("Verificando atualizações.")
-    if updater.update_application(current_version):
-        logger.info("Aplicação atualizada. Reiniciando.")
-        sys.exit(0)
+    try:
+        logger.info("Verificando atualizações.")
+        if updater.update_application(current_version):
+            logger.info("Aplicação atualizada. Reiniciando.")
+            sys.exit(0)
+    except:
+        pass
+
     main(headless=True)
