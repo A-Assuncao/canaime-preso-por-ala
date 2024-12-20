@@ -136,15 +136,12 @@ def main(headless: bool = True) -> None:
 
 if __name__ == '__main__':
     import multiprocessing
-
     multiprocessing.freeze_support()
 
     try:
-        logger.info("Verificando atualizações.")
-        if updater.update_application(current_version):
-            logger.info("Aplicação atualizada. Reiniciando.")
-            sys.exit(0)
-    except:
-        pass
+        logging.info("Verificando atualizações.")
+        updater.update_application(current_version, get_executable_dir())
+    except Exception as e:
+        logging.exception("Erro ao verificar/atualizar a aplicação:")
 
     main(headless=True)
