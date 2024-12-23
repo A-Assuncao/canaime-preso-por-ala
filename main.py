@@ -1,5 +1,4 @@
 import itertools
-import sys
 import tkinter as tk
 from multiprocessing import Process, Queue, Event
 from queue import Empty
@@ -11,7 +10,7 @@ from services.report_service import create_excel_report
 from utils import updater
 from utils.logger import Logger
 
-current_version = 'v0.1.0'  # Versão atual do aplicativo
+current_version = 'v0.2.0'  # Versão atual do aplicativo
 
 logger = Logger.get_logger()  # Obter o logger configurado
 
@@ -136,12 +135,18 @@ def main(headless: bool = True) -> None:
 
 if __name__ == '__main__':
     import multiprocessing
+    import sys
+
     multiprocessing.freeze_support()
 
     try:
-        logging.info("Verificando atualizações.")
-        updater.update_application(current_version, get_executable_dir())
+        logger.info("Verificando atualizações.")
+        if updater.check_and_update(current_version):
+            logger.info("Aplicação atualizada. Reiniciando.")
+            sys.exit(0)
     except Exception as e:
-        logging.exception("Erro ao verificar/atualizar a aplicação:")
+        logger.error(f"Erro ao verificar atualizações: {e}")
+        pass
 
+    # Executa a aplicação principal
     main(headless=True)

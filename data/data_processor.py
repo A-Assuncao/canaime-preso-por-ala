@@ -77,6 +77,32 @@ class UnitProcessor:
                         }
         return None
 
+
+    def normalize_text(self, text):
+        """
+        Normaliza textos que começam com 'REMI' e terminam com '01' ou '02' para
+        'REMIÇÃO01' e 'REMIÇÃO02', independentemente dos caracteres intermediários.
+
+        Parameters
+        ----------
+        text : str
+            Texto a ser normalizado.
+
+        Returns
+        -------
+        str
+            Texto normalizado.
+        """
+        if text.startswith("REMI") and text.endswith("01"):
+            print(f"Texto recebido: {text} -> Texto normalizado: REMIÇÃO01")
+            return "REMIÇÃO01"
+        elif text.startswith("REMI") and text.endswith("02"):
+            print(f"Texto recebido: {text} -> Texto normalizado: REMIÇÃO02")
+            return "REMIÇÃO02"
+        else:
+            return text
+
+
     def create_unit_list(self, unit: str) -> dict:
         """
         Cria uma lista de dicionários contendo detalhes das alas, celas, códigos e presos para a unidade especificada.
@@ -119,7 +145,7 @@ class UnitProcessor:
             inmate = names.nth(i).text_content().strip()
             wing_cell = wing_cell.replace("ALA:", "")
             split_index = wing_cell.rfind('/')
-            wing = wing_cell[:split_index].strip()
+            wing = self.normalize_text(wing_cell[:split_index].strip())  # Normaliza o texto da ala
             cell = wing_cell[split_index + 1:].strip()
 
             # Adicionar os dados brutos à lista raw
@@ -129,10 +155,13 @@ class UnitProcessor:
                 "Code": code[2:],  # Remover os dois primeiros caracteres do código
                 "Inmate": inmate
             })
+            logger.info(f"Adicionado à lista o preso {code[2:]}.")
 
             # Usar a função de mapeamento para formatar os dados corretamente
             formatted_data = self.map_prisoner_data(unit_config, wing, cell, code[2:], inmate)
             if formatted_data:
                 mapped_unit_list.append(formatted_data)
+
+            logger.info(f"Lista de {unit} criada.")
 
         return {unit: mapped_unit_list}

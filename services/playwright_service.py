@@ -23,7 +23,7 @@ def execute_playwright_task(headless, login, password, selected_units):
             # Iterar sobre as unidades selecionadas e coletar dados
             try:
                 for unit in selected_units:
-                    logger.debug(f"Processando unidade: {unit}")
+                    logger.info(f"Processando unidade: {unit}")
                     try:
                         unit_data = unit_processor.create_unit_list(unit)
                         all_units_data.update(unit_data)
@@ -36,5 +36,7 @@ def execute_playwright_task(headless, login, password, selected_units):
     except Exception as e:
         logger.error(f"Erro no Playwright: {str(e)}")
         Logger.capture_error(e)
+
+    logger.info(f"Dados de {unit} capturados.")
 
     return all_units_data

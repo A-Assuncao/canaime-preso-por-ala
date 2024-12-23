@@ -22,6 +22,7 @@ def get_shift_name():
     current_date = datetime.now()
     delta_days = (current_date - base_date).days
     shift_name = shifts[delta_days % len(shifts)]
+    logger.info(f"Plantão calculado: {shift_name}.")
     return shift_name
 
 
@@ -57,6 +58,8 @@ def calculate_data(df):
             calculated_data[bloco][ala] = {}
 
         calculated_data[bloco][ala][cela] = quantidade
+
+    logger.info("Número de presos por cela calculado.")
 
     return calculated_data
 
@@ -122,6 +125,7 @@ def fill_control_sheet(ws, data):
 
         # Somatório da coluna na linha 33
         ws[f'{col}{total_row}'] = f'=SUM({col}{row_start}:{col}{row_end})'
+        ws['O33'] = f'=SUM(O5:O10)'
         ws[f'{col}{total_row}'].alignment = center_alignment  # Centraliza o somatório
 
     # Somatório de todas as celas de REMIÇÃO 01 e REMIÇÃO 02
@@ -160,7 +164,7 @@ def fill_control_sheet(ws, data):
     ws['B15'] = '=W33'
     ws['B16'] = '=Y33'
     ws['B17'] = '=AA33'
-    ws['B18'] = '=SUM(B11:B17)'
+    ws['B18'] = '=SUM(B9:B17)'
     ws['B24'] = '=SUM(B19:B23)'
     ws['B30'] = '=SUM(B25:B28)'
     ws['B35'] = '=SUM(B8,B18,B24)'
@@ -203,6 +207,8 @@ def fill_control_sheet(ws, data):
     # Alinhamento centralizado das células de B3 até B36
     for row in range(3, 37):
         ws[f'B{row}'].alignment = center_alignment
+
+    logger.info('Aba "Controle" preenchida.')
 
 
 def fill_sei_sheet(ws_sei, ws_control):
@@ -324,6 +330,8 @@ def fill_sei_sheet(ws_sei, ws_control):
         for cell in row:
             cell.alignment = Alignment(horizontal='center', vertical='center')
 
+    logger.info('Aba "SEI" preenchida.')
+
 
 def create_excel_report(data):
     """
@@ -342,7 +350,7 @@ def create_excel_report(data):
 
     try:
         for unit_name, df_list in data.items():
-            logger.debug(f"Processando unidade: {unit_name}")
+            logger.info(f"Processando unidade: {unit_name}")
             # Converter os dados da unidade em um DataFrame
             if df_list:
                 df = pd.DataFrame(df_list)
@@ -353,7 +361,7 @@ def create_excel_report(data):
 
                 # Realizar cálculos nos dados
                 calculated_data = calculate_data(df)
-                logger.debug(f"Dados calculados: {calculated_data}")
+                logger.info(f"Dados calculados: {calculated_data}")
 
                 # Preencher as abas de controle e SEI
                 fill_control_sheet(control_ws, calculated_data)
@@ -363,20 +371,29 @@ def create_excel_report(data):
         if "Sheet" in wb.sheetnames:
             wb.remove(wb["Sheet"])
 
-            # Gerar nome do arquivo baseado no plantão e data
-            shift_name = get_shift_name()
-            current_date = datetime.now().strftime('%d-%m-%Y')
-            default_filename = f"Contagem-{shift_name}-{current_date}.xlsx"
+        # Gerar nome do arquivo baseado no plantão e data
+        shift_name = get_shift_name()
+        current_date = datetime.now().strftime('%d-%m-%Y')
+        default_filename = f"{shift_name} {current_date}.xlsx"
 
-            # Abrir a caixa de diálogo para o usuário escolher onde salvar o arquivo
-            file_path = filedialog.asksaveasfilename(defaultextension=".xlsx", initialfile=default_filename,
-                                                     filetypes=[("Excel files", "*.xlsx")])
+        # Abrir a caixa de diálogo para o usuário escolher onde salvar o arquivo
+        file_path = filedialog.asksaveasfilename(defaultextension=".xlsx", initialfile=default_filename,
+                                                 filetypes=[("Excel files", "*.xlsx")])
 
-            if file_path:
-                wb.save(file_path)
-                logger.info(f"Relatório salvo com sucesso em: {file_path}")
-            else:
-                logger.warning("Salvamento cancelado pelo usuário.")
+        if file_path:
+            attempt = 1
+            while True:
+                try:
+                    wb.save(file_path)
+                    logger.info(f"Relatório salvo com sucesso em: {file_path}")
+                    break
+                except PermissionError:
+                    logger.warning(f"Permissão negada ao salvar o arquivo: {file_path}. Tentando salvar com outro nome.")
+                    file_path = file_path.replace(".xlsx", f" ({attempt}).xlsx")
+                    attempt += 1
+        else:
+            logger.warning("Salvamento cancelado pelo usuário.")
+
     except Exception as e:
         Logger.capture_error(e)
         logger.error(f"Erro ao criar o relatório Excel: {str(e)}")
