@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+*__pycache__/
 *.py[cod]
 *$py.class
 
@@ -162,3 +163,4 @@ cython_debug/
 .idea/
 Presos por Ala.xlsx
 dados_ficticios.py
+*app_log.log

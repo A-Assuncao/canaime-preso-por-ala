@@ -323,7 +323,7 @@ def fill_sei_sheet(ws_sei, ws_control):
 
     ws_sei['B67'] = '=SUM(B66:N66)'  # Total B
     ws_sei['B68'] = triagem  # Triagem
-    ws_sei['B69'] = '=SUM(B67:B68)'  # total geral
+    ws_sei['B69'] = '=SUM(B67,B68,B35)'  # total geral
 
     # Centralizando o conteúdo das células da aba SEI
     for row in ws_sei.iter_rows(min_row=42, max_row=69, min_col=2, max_col=14):
