@@ -10,7 +10,7 @@ from services.report_service import create_excel_report
 from utils import updater
 from utils.logger import Logger
 
-current_version = 'v0.2.0'  # Versão atual do aplicativo
+current_version = 'v0.2.1'  # Versão atual do aplicativo
 
 logger = Logger.get_logger()  # Obter o logger configurado
 
