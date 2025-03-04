@@ -8,6 +8,7 @@ logger = Logger.get_logger()
 
 def execute_playwright_task(headless, login, password, selected_units):
     logger.info("Executando tarefa do Playwright.")
+    all_units_data = {}
     try:
         with sync_playwright() as p:
             # Inicializar a classe de login e realizar o login
@@ -17,9 +18,6 @@ def execute_playwright_task(headless, login, password, selected_units):
             # Instanciar o UnitProcessor com a página logada
             unit_processor = UnitProcessor(page)
 
-            # Inicializar dicionário para armazenar dados de todas as unidades
-            all_units_data = {}
-
             # Iterar sobre as unidades selecionadas e coletar dados
             try:
                 for unit in selected_units:
@@ -28,6 +26,7 @@ def execute_playwright_task(headless, login, password, selected_units):
                         unit_data = unit_processor.create_unit_list(unit)
                         all_units_data.update(unit_data)
                         logger.debug(f"Dados da unidade {unit}: {unit_data}")
+                        logger.info(f"Dados de {unit} capturados.")
                     except Exception as e:
                         logger.error(f"Erro ao processar unidade {unit}: {str(e)}")
                         Logger.capture_error(e)
@@ -36,7 +35,5 @@ def execute_playwright_task(headless, login, password, selected_units):
     except Exception as e:
         logger.error(f"Erro no Playwright: {str(e)}")
         Logger.capture_error(e)
-
-    logger.info(f"Dados de {unit} capturados.")
 
     return all_units_data
