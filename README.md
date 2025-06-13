@@ -2,6 +2,8 @@
 
 Este projeto tem como objetivo automatizar a coleta de dados de presidiários de diferentes unidades prisionais usando a biblioteca Playwright para navegação automatizada e gerar relatórios detalhados em Excel.
 
+**Versão Atual:** v0.2.2
+
 ## Índice
 
 - [Sobre o Projeto](#sobre-o-projeto)
@@ -15,7 +17,17 @@ Este projeto tem como objetivo automatizar a coleta de dados de presidiários de
 
 ## Sobre o Projeto
 
-O projeto **Canaime Preso por Ala** automatiza o login em um sistema de gerenciamento de presidiários, coleta dados sobre presos em diferentes alas de unidades prisionais e gera relatórios em formato Excel. O objetivo é fornecer uma ferramenta eficiente para monitoramento e análise de dados de detentos.
+O projeto **Canaime Preso por Ala** é uma ferramenta automatizada que:
+
+- Realiza login automático no sistema de gerenciamento de presidiários
+- Permite seleção flexível de unidades prisionais para processamento
+- Coleta dados detalhados sobre presos em diferentes alas
+- Gera relatórios organizados em formato Excel
+- Possui interface gráfica amigável para interação com o usuário
+- Inclui sistema de atualização automática
+- Mantém logs detalhados das operações
+
+O objetivo principal é fornecer uma ferramenta eficiente para monitoramento e análise de dados de detentos, reduzindo o tempo necessário para coleta manual de informações.
 
 ## Requisitos
 
@@ -59,11 +71,18 @@ O projeto **Canaime Preso por Ala** automatiza o login em um sistema de gerencia
     python main.py
     ```
 
-2. Uma interface gráfica será aberta. Digite seu login e senha e selecione as unidades prisionais que deseja processar.
+2. Uma interface gráfica será aberta solicitando:
+   - Login e senha do sistema
+   - Seleção das unidades prisionais desejadas
+   - Opção de uso de HTTPS (recomendado)
 
-3. Após clicar em "Confirmar", o programa fará login no sistema e coletará os dados.
+3. Após confirmar, o programa:
+   - Realizará login no sistema automaticamente
+   - Coletará os dados das unidades selecionadas
+   - Exibirá uma janela de status com progresso em tempo real
+   - Gerará o relatório em Excel automaticamente
 
-4. O relatório será gerado em formato Excel e salvo como `Presos por Ala.xlsx` na pasta do projeto.
+4. O relatório será salvo como `Presos por Ala.xlsx` na pasta do projeto.
 
 ## Atualização do Software
 
@@ -81,32 +100,31 @@ Abaixo está a estrutura atualizada do projeto:
 ├── 📂 config             # Arquivos de configuração e geração de planilhas
 │   ├── excel_config_control.py  # Configurações da aba 'Controle' do Excel
 │   ├── excel_config_sei.py      # Configurações da aba 'SEI' do Excel
-│   └── units_config.json        # Configurações das unidades e alas
+│   └── units_config.py        # Configurações das unidades e alas
 │
 ├── 📂 data               # Manipulação e processamento de dados
 │   ├── data_processor.py       # Processa e formata os dados extraídos
 │   └── 📂 processed           # Armazenar dados gerados em tempo de execução
 │
-├── 📂 gui                # Interface gráfica com o usuário (login e seleção de unidades)
+├── 📂 gui                # Interface gráfica com o usuário
 │   ├── 📂 login                # Componentes relacionados ao login
 │   │   └── login_canaime.py    # Tela de login para o sistema Canaimé
 │   └── 📂 selectors            # Componentes de seleção
 │       └── unit_selector.py    # Seleção de unidades para geração de relatório
 │
-├── 📂 services           # Serviços de integração com Canaimé e geração de relatórios
-│   ├── canaime_service.py      # Realiza o login no sistema Canaimé
+├── 📂 services           # Serviços principais
 │   ├── playwright_service.py   # Executa tarefas usando Playwright
-│   └── report_service.py       # Gera relatórios Excel com base nos dados extraídos
+│   └── report_service.py       # Gera relatórios Excel
 │
 ├── 📂 utils              # Utilitários do sistema
-│   ├── logger.py              # Captura erros e gera logs
-│   └── updater.py             # Verifica atualizações da aplicação
+│   ├── logger.py              # Sistema de logging
+│   └── updater.py             # Sistema de atualização automática
 │
 ├── .gitignore            # Arquivos e pastas ignoradas pelo Git
 ├── LICENSE               # Licença do projeto
-├── main.py               # Arquivo principal da aplicação
+├── main.py               # Ponto de entrada da aplicação
 ├── README.md             # Este arquivo
-└── requirements.txt      # Lista de dependências do projeto
+└── requirements.txt      # Dependências do projeto
 ```
 
 ## Contribuição
