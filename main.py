@@ -15,13 +15,13 @@ current_version = 'v0.2.1'  # Versão atual do aplicativo
 logger = Logger.get_logger()  # Obter o logger configurado
 
 
-def process_task(headless, queue, stop_event, login, password, selected_units):
+def process_task(headless, queue, stop_event, login, password, selected_units, use_https):
     """
     Função para ser executada no processo separado, executa as tarefas necessárias usando Playwright.
     """
     try:
         # Execute Playwright tasks e obtenha os dados
-        all_units_data = execute_playwright_task(headless, login, password, selected_units)
+        all_units_data = execute_playwright_task(headless, login, password, selected_units, use_https)
         queue.put("Processo Completo.")
 
         if all_units_data:
@@ -40,12 +40,13 @@ def process_task(headless, queue, stop_event, login, password, selected_units):
 
 
 class StatusApp:
-    def __init__(self, root, headless, login, password, selected_units):
+    def __init__(self, root, headless, login, password, selected_units, use_https):
         self.root = root
         self.headless = headless
         self.login = login
         self.password = password
         self.selected_units = selected_units
+        self.use_https = use_https
         self.frames = itertools.cycle(["◐", "◓", "◑", "◒"])
         self.queue = Queue()  # Fila para comunicação entre processos
         self.stop_event = Event()  # Evento para sinalizar a parada do processo
@@ -81,7 +82,7 @@ class StatusApp:
 
     def executar_tarefas(self):
         p = Process(target=process_task,
-                    args=(self.headless, self.queue, self.stop_event, self.login, self.password, self.selected_units))
+                    args=(self.headless, self.queue, self.stop_event, self.login, self.password, self.selected_units, self.use_https))
         p.start()
         self.root.after(100, self.verificar_fila)
 
@@ -111,7 +112,7 @@ class StatusApp:
 
 def main(headless: bool = True) -> None:
     logger.info("Aplicação iniciada.")
-    login, password = executar_login()
+    login, password, use_https = executar_login()
     if not login or not password:
         logger.warning("Login não efetuado. Encerrando.")
         return
@@ -125,7 +126,7 @@ def main(headless: bool = True) -> None:
 
     try:
         root = tk.Tk()
-        StatusApp(root, headless, login, password, selected_units)
+        StatusApp(root, headless, login, password, selected_units, use_https)
         root.mainloop()
     except Exception as e:
         logger.error(f"Erro durante o main loop: {str(e)}", exc_info=True)
@@ -149,4 +150,4 @@ if __name__ == '__main__':
         pass
 
     # Executa a aplicação principal
-    main(headless=True)
+    main(headless=False)

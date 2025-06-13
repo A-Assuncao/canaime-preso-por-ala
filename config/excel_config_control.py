@@ -1,20 +1,16 @@
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from datetime import datetime
-import json
 import os
+from config.units_config import UNITS_CONFIG
 
 # Define o diretório base relativo à localização do arquivo atual
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def load_units_config():
-    # Constrói o caminho absoluto para o arquivo de configuração
-    config_path = os.path.join(BASE_DIR, 'units_config.json')
-    # Carregar configurações do arquivo JSON
-    with open(config_path, 'r', encoding='utf-8') as file:
-        config_data = json.load(file)
-    return config_data
+    # Retorna diretamente a configuração do módulo Python
+    return UNITS_CONFIG
 
 
 def calculate_shift(date):

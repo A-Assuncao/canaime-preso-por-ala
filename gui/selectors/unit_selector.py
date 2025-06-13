@@ -1,8 +1,9 @@
 import tkinter as tk
 import sys
+from config.units_config import UNITS_CONFIG
 
-# Lista de unidades disponíveis
-units = ('PAMC', 'CPBV', 'CPFBV', 'CPP', 'UPRRO')
+# Lista de unidades disponíveis (extraídas do UNITS_CONFIG)
+units = tuple(UNITS_CONFIG.keys())
 
 # Lista de unidades ativas (modifique conforme necessário)
 active_units = ['PAMC']  # Exemplo: adicione outras unidades ativas como 'CPBV', etc.

@@ -1,47 +1,21 @@
 import json
 from playwright.sync_api import Page
 from utils.resource_manager import resource_path
+from config.units_config import UNITS_CONFIG
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class UnitProcessor:
-    def __init__(self, page: Page):
+    def __init__(self, page: Page, use_https: bool = True):
         self.page = page
-        self.units_config = self.load_units_config()
-
-    def load_units_config(self):
-        """
-        Carrega a configuração das unidades a partir do arquivo JSON.
-
-        Returns
-        -------
-        dict
-            Dicionário com a configuração das unidades, ou um dicionário vazio em caso de falha.
-        """
-        try:
-            # Supondo que você esteja carregando o config/units_config.json:
-            units_config_path = resource_path('config/units_config.json')
-            logger.info(f"Carregando a configuração das unidades de {units_config_path}")
-
-            # Use-o assim ao carregar o arquivo:
-            with open(units_config_path, 'r', encoding='utf-8') as file:
-                units_config = json.load(file)
-                logger.info("Configuração das unidades carregada com sucesso.")
-                return units_config
-
-        except FileNotFoundError:
-            logger.error(f"Arquivo de configuração não encontrado: {units_config_path}")
-            return {}
-
-        except json.JSONDecodeError as e:
-            logger.error(f"Erro ao decodificar o JSON: {e}")
-            return {}
+        self.units_config = UNITS_CONFIG
+        self.use_https = use_https
 
     def map_prisoner_data(self, unit_config, wing, cell, code, inmate):
         """
-        Mapeia os dados do preso para a estrutura da unidade conforme definida no JSON de configuração.
+        Mapeia os dados do preso para a estrutura da unidade conforme definida no arquivo de configuração.
 
         Parameters
         ----------
@@ -129,8 +103,9 @@ class UnitProcessor:
         logger.info(f"Processando a unidade {unit}.")
 
         # Carregar a página e coletar os elementos necessários
+        protocol = 'https' if self.use_https else 'http'
         self.page.goto(
-            f'https://canaime.com.br/sgp2rr/areas/impressoes/UND_ChamadaFOTOS_todos2.php?id_und_prisional={unit}',
+            f'{protocol}://canaime.com.br/sgp2rr/areas/impressoes/UND_ChamadaFOTOS_todos2.php?id_und_prisional={unit}',
             timeout=0
         )
         all_entries = self.page.locator('.titulobkSingCAPS')

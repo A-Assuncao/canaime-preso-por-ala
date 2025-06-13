@@ -1,4 +1,4 @@
-{
+UNITS_CONFIG = {
     "PAMC": {
         "blocks": {
             "A": {
