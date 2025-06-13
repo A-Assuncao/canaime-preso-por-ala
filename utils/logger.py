@@ -5,7 +5,6 @@ import platform
 import socket
 import psutil
 import os
-import sys
 
 class Logger:
     _initialized = False
@@ -16,46 +15,28 @@ class Logger:
     @staticmethod
     def get_logger(log_file_path=None, level=logging.INFO):
         if not Logger._initialized:
-            # Criar o logger
             Logger._logger = logging.getLogger("CanaimeApp")
             Logger._logger.setLevel(level)
-            
-            # Verificar se o logger já tem handlers para evitar duplicação
-            if not Logger._logger.handlers:
-                # Configurar o diretório de logs
-                if log_file_path is None:
-                    log_dir = os.path.join(os.getcwd(), 'logs')
-                    if not os.path.exists(log_dir):
-                        os.makedirs(log_dir)
-                    log_file_path = os.path.join(log_dir, 'app_log.log')
-                
-                # Adicionar handler de arquivo
-                file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
-                file_handler.setLevel(level)
-                formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s:%(filename)s:%(lineno)d - %(message)s')
-                file_handler.setFormatter(formatter)
-                Logger._logger.addHandler(file_handler)
-                
-                # Adicionar handler de console
-                console_handler = logging.StreamHandler()
-                console_handler.setLevel(level)
-                console_handler.setFormatter(formatter)
-                Logger._logger.addHandler(console_handler)
-            
+
+            # Configurar o manipulador de arquivo
+            if log_file_path is None:
+                log_file_path = os.path.join(os.getcwd(), 'app_log.log')
+
+            handler = logging.FileHandler(log_file_path, encoding='utf-8')
+            handler.setLevel(level)
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            Logger._logger.addHandler(handler)
+
             Logger._initialized = True
-        
         return Logger._logger
 
     @staticmethod
     def capture_error(error: Exception):
         logger = Logger.get_logger()
-        if logger is None:
-            print("Logger não inicializado corretamente")
-            return
-            
         error_message = f"Erro capturado: {str(error)}"
         traceback_message = traceback.format_exc()
-    
+
         # Obter informações do sistema
         system_info = Logger.get_system_info()
 
@@ -64,8 +45,6 @@ class Logger:
 
         # Enviar para o Discord
         Logger.send_to_discord(detailed_log)
-        
-        return detailed_log
 
     @staticmethod
     def send_to_discord(message):
@@ -101,36 +80,6 @@ class Logger:
             return "\n".join([f"{key}: {value}" for key, value in system_info.items()])
         except Exception as e:
             return f"Erro ao coletar informações do sistema: {e}"
-            
-    @staticmethod
-    def reset():
-        """Reseta o estado do logger para testes."""
-        Logger._initialized = False
-        Logger._logger = None
-        
-    @staticmethod
-    def info(message):
-        """Registra uma mensagem de informação."""
-        logger = Logger.get_logger()
-        logger.info(message)
-        
-    @staticmethod
-    def error(message):
-        """Registra uma mensagem de erro."""
-        logger = Logger.get_logger()
-        logger.error(message)
-        
-    @staticmethod
-    def debug(message):
-        """Registra uma mensagem de debug."""
-        logger = Logger.get_logger()
-        logger.debug(message)
-        
-    @staticmethod
-    def warning(message):
-        """Registra uma mensagem de aviso."""
-        logger = Logger.get_logger()
-        logger.warning(message)
 
 if __name__ == "__main__":
     try:

@@ -1,16 +1,11 @@
-"""
-Aplicação Canaimé - Preso por Ala.
-
-Ponto de entrada principal da aplicação.
-"""
 import itertools
 import tkinter as tk
 from multiprocessing import Process, Queue, Event
 from queue import Empty
 
-from controllers.login_controller import executar_login
+from gui.login.login_canaime import executar_login
 from gui.selectors.unit_selector import select_units
-from models.services.data_service import DataService
+from services.playwright_service import execute_playwright_task
 from services.report_service import create_excel_report
 from utils import updater
 from utils.logger import Logger
@@ -20,16 +15,13 @@ current_version = 'v0.2.1'  # Versão atual do aplicativo
 logger = Logger.get_logger()  # Obter o logger configurado
 
 
-def process_task(headless, queue, stop_event, login, password, selected_units):
+def process_task(headless, queue, stop_event, login, password, selected_units, use_https):
     """
     Função para ser executada no processo separado, executa as tarefas necessárias usando Playwright.
     """
     try:
-        # Inicializar o serviço de dados
-        data_service = DataService()
-        
         # Execute Playwright tasks e obtenha os dados
-        all_units_data = data_service.process_multiple_units(headless, login, password, selected_units)
+        all_units_data = execute_playwright_task(headless, login, password, selected_units, use_https)
         queue.put("Processo Completo.")
 
         if all_units_data:
@@ -42,53 +34,19 @@ def process_task(headless, queue, stop_event, login, password, selected_units):
         else:
             queue.put("Nenhum dado processado.")
     except Exception as e:
-        logger.error(f"Erro durante o processamento: {str(e)}", exc_info=True)
-        Logger.capture_error(e)
         queue.put(f"Erro: {str(e)}")
     finally:
         stop_event.set()  # Sinaliza que o processo terminou
 
 
 class StatusApp:
-    """
-    Aplicação para exibir o status do processamento.
-    
-    Attributes
-    ----------
-    root : tk.Tk
-        Janela principal
-    headless : bool
-        Indica se o navegador deve ser executado em modo headless
-    login : str
-        Login para acesso ao sistema
-    password : str
-        Senha para acesso ao sistema
-    selected_units : list
-        Lista de unidades selecionadas
-    """
-    
-    def __init__(self, root, headless, login, password, selected_units):
-        """
-        Inicializa a aplicação de status.
-        
-        Parameters
-        ----------
-        root : tk.Tk
-            Janela principal
-        headless : bool
-            Indica se o navegador deve ser executado em modo headless
-        login : str
-            Login para acesso ao sistema
-        password : str
-            Senha para acesso ao sistema
-        selected_units : list
-            Lista de unidades selecionadas
-        """
+    def __init__(self, root, headless, login, password, selected_units, use_https):
         self.root = root
         self.headless = headless
         self.login = login
         self.password = password
         self.selected_units = selected_units
+        self.use_https = use_https
         self.frames = itertools.cycle(["◐", "◓", "◑", "◒"])
         self.queue = Queue()  # Fila para comunicação entre processos
         self.stop_event = Event()  # Evento para sinalizar a parada do processo
@@ -113,11 +71,9 @@ class StatusApp:
         self.root.protocol("WM_DELETE_WINDOW", self.fechar)
 
     def iniciar_animacao(self):
-        """Inicia a animação de carregamento."""
         self.root.after(0, self.animar_bolinha)
 
     def animar_bolinha(self):
-        """Animação de carregamento."""
         if not self.rodando:
             return
         frame = next(self.frames)
@@ -125,14 +81,12 @@ class StatusApp:
         self.root.after(200, self.animar_bolinha)
 
     def executar_tarefas(self):
-        """Inicia o processo de execução das tarefas."""
         p = Process(target=process_task,
-                    args=(self.headless, self.queue, self.stop_event, self.login, self.password, self.selected_units))
+                    args=(self.headless, self.queue, self.stop_event, self.login, self.password, self.selected_units, self.use_https))
         p.start()
         self.root.after(100, self.verificar_fila)
 
     def verificar_fila(self):
-        """Verifica a fila de mensagens do processo."""
         if not self.stop_event.is_set():
             try:
                 message = self.queue.get_nowait()
@@ -148,41 +102,21 @@ class StatusApp:
             self.fechar()
 
     def atualizar_status(self, mensagem):
-        """
-        Atualiza o status exibido.
-        
-        Parameters
-        ----------
-        mensagem : str
-            Mensagem de status
-        """
         self.label_status.config(text=mensagem)
 
     def fechar(self):
-        """Fecha a aplicação de status."""
         self.rodando = False
         self.root.withdraw()
         self.root.quit()
 
 
 def main(headless: bool = True) -> None:
-    """
-    Função principal da aplicação.
-    
-    Parameters
-    ----------
-    headless : bool, optional
-        Indica se o navegador deve ser executado em modo headless
-    """
     logger.info("Aplicação iniciada.")
-    
-    # Executar o login
-    login, password = executar_login()
+    login, password, use_https = executar_login()
     if not login or not password:
         logger.warning("Login não efetuado. Encerrando.")
         return
 
-    # Selecionar unidades
     selected_units = select_units()
     logger.debug(f"Unidades selecionadas: {selected_units}")
 
@@ -190,14 +124,12 @@ def main(headless: bool = True) -> None:
         logger.warning("Nenhuma unidade selecionada. Encerrando.")
         return
 
-    # Iniciar o processamento
     try:
         root = tk.Tk()
-        StatusApp(root, headless, login, password, selected_units)
+        StatusApp(root, headless, login, password, selected_units, use_https)
         root.mainloop()
     except Exception as e:
         logger.error(f"Erro durante o main loop: {str(e)}", exc_info=True)
-        Logger.capture_error(e)
     finally:
         logger.info("Aplicação finalizada.")
 
@@ -218,4 +150,4 @@ if __name__ == '__main__':
         pass
 
     # Executa a aplicação principal
-    main(headless=True)
+    main(headless=False)

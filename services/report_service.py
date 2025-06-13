@@ -5,7 +5,7 @@ from openpyxl.styles import Alignment
 from openpyxl.utils import column_index_from_string, get_column_letter
 from config.excel_config_control import generate_unit_control_sheet
 from config.excel_config_sei import generate_unit_sei_sheet
-from tkinter import filedialog
+from tkinter import filedialog, Tk
 
 from utils.logger import Logger
 
@@ -376,9 +376,17 @@ def create_excel_report(data):
         current_date = datetime.now().strftime('%d-%m-%Y')
         default_filename = f"{shift_name} {current_date}.xlsx"
 
+        # Criar uma janela Tk oculta para garantir que a caixa de diálogo apareça na frente
+        root = Tk()
+        root.withdraw()  # Esconde a janela principal
+        root.attributes('-topmost', True)  # Garante que a janela fique no topo
+
         # Abrir a caixa de diálogo para o usuário escolher onde salvar o arquivo
         file_path = filedialog.asksaveasfilename(defaultextension=".xlsx", initialfile=default_filename,
                                                  filetypes=[("Excel files", "*.xlsx")])
+
+        # Destruir a janela Tk após o uso
+        root.destroy()
 
         if file_path:
             attempt = 1

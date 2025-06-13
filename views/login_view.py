@@ -1,202 +1,143 @@
-"""
-View de Login.
+def __init__(self):
+    """Inicializa a view de login."""
+    self.logger = LoggerAdapter().get_logger()
+    self.root = None
+    self.username_var = None
+    self.password_var = None
+    self.use_https_var = None  # Nova variável para controlar o uso de HTTPS
+    self.credentials = None
 
-Interface gráfica para autenticação do usuário no sistema Canaimé.
-"""
-import tkinter as tk
-import itertools
-import time
-
-from utils.logger import Logger
-
-logger = Logger.get_logger()
-
-
-class LoginView:
+def show_dialog(self):
     """
-    View para a tela de login.
+    Exibe o diálogo de login e retorna as credenciais inseridas.
     
-    Attributes
-    ----------
-    root : tk.Tk
-        Referência para a janela principal
-    controller : LoginController
-        Referência para o controlador de login
-    usuario : str
-        Nome de usuário após o login bem-sucedido
-    senha : str
-        Senha após o login bem-sucedido
+    Returns:
+        tuple: Uma tupla (username, password) ou None se cancelado.
     """
-    
-    def __init__(self, root, controller):
-        """
-        Inicializa a interface de login.
+    try:
+        self.logger.info("Exibindo diálogo de login")
         
-        Parameters
-        ----------
-        root : tk.Tk
-            Janela principal
-        controller : LoginController
-            Controlador de login
-        """
-        self.root = root
-        self.controller = controller
+        # Criar janela de diálogo
+        self.root = tk.Toplevel()
+        self.root.title("Login - Canaime")
+        self.root.geometry("400x300")
+        self.root.resizable(False, False)
+        self.root.transient()  # Tornar modal
+        self.root.grab_set()  # Bloquear outras janelas
         
-        # Configuração da interface
-        self.configurar_janela()
-        self.criar_widgets()
+        # Inicializar as variáveis de texto depois de criar a janela
+        self.username_var = tk.StringVar()
+        self.password_var = tk.StringVar()
+        self.use_https_var = tk.BooleanVar(value=True)  # Por padrão, usar HTTPS
         
-        # Variáveis para armazenar credenciais
-        self.usuario = None
-        self.senha = None
+        # Configurar o ícone (se disponível)
+        try:
+            self.root.iconbitmap("assets/icon.ico")
+        except:
+            self.logger.warning("Ícone não encontrado")
         
-        # Animação e status
-        self.frames = itertools.cycle(["◐", "◓", "◑", "◒"])
-        self.rodando = False
-    
-    def configurar_janela(self):
-        """Configura a janela principal da aplicação."""
-        self.root.title("Login Canaimé")
-        largura_janela, altura_janela = 300, 225
-        self.centralizar_janela(largura_janela, altura_janela)
-        self.root.attributes('-topmost', True)
-    
-    def centralizar_janela(self, largura_janela, altura_janela):
-        """
-        Centraliza a janela na tela.
+        # Centralizar na tela
+        self.center_window()
         
-        Parameters
-        ----------
-        largura_janela : int
-            Largura da janela
-        altura_janela : int
-            Altura da janela
-        """
-        largura_tela = self.root.winfo_screenwidth()
-        altura_tela = self.root.winfo_screenheight()
-        pos_x = (largura_tela - largura_janela) // 2
-        pos_y = (altura_tela - altura_janela) // 2
-        self.root.geometry(f"{largura_janela}x{altura_janela}+{pos_x}+{pos_y}")
-    
-    def criar_widgets(self):
-        """Cria todos os widgets da interface."""
+        # Frame principal
+        main_frame = ttk.Frame(self.root, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Título
+        title_label = ttk.Label(
+            main_frame, 
+            text="Login - Canaime", 
+            font=("Helvetica", 12, "bold")
+        )
+        title_label.pack(pady=(0, 20))
+        
         # Campo de usuário
-        self.label_usuario = tk.Label(self.root, text="Usuário:", anchor='w')
-        self.label_usuario.pack(pady=(10, 2))
+        username_frame = ttk.Frame(main_frame)
+        username_frame.pack(fill=tk.X, pady=5)
         
-        self.entry_usuario = tk.Entry(self.root)
-        self.entry_usuario.pack(pady=(0, 10))
-        self.entry_usuario.focus_set()
+        username_label = ttk.Label(username_frame, text="Usuário:")
+        username_label.pack(side=tk.LEFT, padx=(0, 5))
+        
+        username_entry = ttk.Entry(username_frame, textvariable=self.username_var)
+        username_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         # Campo de senha
-        self.label_senha = tk.Label(self.root, text="Senha:", anchor='w')
-        self.label_senha.pack(pady=(10, 2))
+        password_frame = ttk.Frame(main_frame)
+        password_frame.pack(fill=tk.X, pady=5)
         
-        self.entry_senha = tk.Entry(self.root, show="*")
-        self.entry_senha.pack(pady=(0, 10))
+        password_label = ttk.Label(password_frame, text="Senha:")
+        password_label.pack(side=tk.LEFT, padx=(0, 5))
         
-        # Botão de login
-        self.btn_login = tk.Button(self.root, text="Login", command=self.executar_login)
-        self.btn_login.pack(pady=10)
+        password_entry = ttk.Entry(password_frame, textvariable=self.password_var, show="*")
+        password_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # Label para mostrar status (como animação de carregamento)
-        self.label_status = tk.Label(self.root, text="")
-        self.label_status.pack(pady=10)
+        # Caixa de seleção para HTTP/HTTPS
+        https_frame = ttk.Frame(main_frame)
+        https_frame.pack(fill=tk.X, pady=5)
         
-        # Configuração de eventos
-        self.entry_senha.bind("<Return>", lambda event: self.executar_login())
-        self.root.protocol("WM_DELETE_WINDOW", self.cancelar)
-    
-    def executar_login(self):
-        """Inicia o processo de login."""
-        usuario = self.entry_usuario.get()
-        senha = self.entry_senha.get()
-        self.controller.iniciar_login(usuario, senha)
-    
-    def iniciar_animacao(self):
-        """Inicia a animação de carregamento."""
-        self.btn_login.config(state=tk.DISABLED)
-        self.rodando = True
-        self.animar_bolinha()
-    
-    def animar_bolinha(self):
-        """Animação de carregamento."""
-        if not self.rodando:
-            return
+        https_check = ttk.Checkbutton(
+            https_frame, 
+            text="Usar HTTPS (desmarque se o site estiver com certificado expirado)", 
+            variable=self.use_https_var
+        )
+        https_check.pack(side=tk.LEFT)
         
-        frame = next(self.frames)
-        self.label_status.config(text=f"Realizando login... {frame}")
-        self.root.after(200, self.animar_bolinha)
-    
-    def parar_animacao(self):
-        """Para a animação de carregamento."""
-        self.rodando = False
-        self.label_status.config(text="")
-        self.btn_login.config(state=tk.NORMAL)
-    
-    def login_sucesso(self, usuario, senha):
-        """
-        Processa o login bem-sucedido.
+        # Explicação sobre a opção HTTP/HTTPS
+        explanation_label = ttk.Label(
+            main_frame, 
+            text="Às vezes o site pode estar com certificado SSL/TLS expirado.\nNesse caso, desmarque esta opção para usar HTTP.",
+            font=("Helvetica", 8),
+            foreground="gray"
+        )
+        explanation_label.pack(pady=(0, 10))
         
-        Parameters
-        ----------
-        usuario : str
-            Nome de usuário
-        senha : str
-            Senha
-        """
-        self.usuario = usuario
-        self.senha = senha
-        logger.info(f"Login bem-sucedido para o usuário: {usuario}")
-        self.parar_animacao()
-        self.label_status.config(text="Login realizado com sucesso!")
-        self.root.after(1000, self.fechar)
-    
-    def mostrar_erro(self, mensagem):
-        """
-        Exibe uma mensagem de erro.
+        # Botões
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(10, 0))
         
-        Parameters
-        ----------
-        mensagem : str
-            Mensagem de erro
-        """
-        self.parar_animacao()
-        logger.error(f"Erro de login: {mensagem}")
-        self.label_status.config(text=mensagem)
-    
-    def cancelar(self):
-        """Cancela o processo de login."""
-        logger.info("Login cancelado pelo usuário")
-        self.usuario = None
-        self.senha = None
-        self.fechar()
-    
-    def fechar(self):
-        """Fecha a janela de login."""
-        self.root.withdraw()
-        self.root.quit()
-    
-    def atualizar_interface(self, callback):
-        """
-        Atualiza a interface a partir de threads secundárias.
+        login_button = ttk.Button(
+            button_frame, 
+            text="Login", 
+            command=self.fazer_login
+        )
+        login_button.pack(side=tk.RIGHT, padx=(5, 0))
         
-        Parameters
-        ----------
-        callback : function
-            Função a ser executada na thread principal
-        """
-        self.root.after(0, callback)
-    
-    def get_credentials(self):
-        """
-        Obtém as credenciais após o login.
+        cancel_button = ttk.Button(
+            button_frame, 
+            text="Cancelar", 
+            command=self.root.destroy
+        )
+        cancel_button.pack(side=tk.RIGHT)
         
-        Returns
-        -------
-        tuple or None
-            Tupla (usuario, senha) se o login for bem-sucedido, None caso contrário
-        """
-        if self.usuario and self.senha:
-            return self.usuario, self.senha
-        return None, None 
+        # Status
+        self.status_label = ttk.Label(main_frame, text="")
+        self.status_label.pack(pady=(10, 0))
+        
+        # Configurar eventos
+        self.root.bind("<Return>", lambda event: self.fazer_login())
+        self.root.bind("<Escape>", lambda event: self.root.destroy())
+        
+        # Focar no campo de usuário
+        username_entry.focus()
+        
+        # Iniciar o loop de eventos
+        self.root.mainloop()
+        
+        # Retornar as credenciais após o fechamento da janela
+        return self.credentials
+        
+    except Exception as e:
+        self.logger.error(f"Erro ao exibir diálogo de login: {str(e)}")
+        return None
+
+def get_credentials(self):
+    """
+    Retorna as credenciais inseridas pelo usuário.
+    
+    Returns:
+        tuple: Uma tupla (username, password, use_https) ou None se cancelado.
+    """
+    if self.credentials:
+        username, password = self.credentials
+        return (username, password, self.use_https_var.get())
+    return None 
