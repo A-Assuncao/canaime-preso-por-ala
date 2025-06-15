@@ -9,8 +9,9 @@ from services.playwright_service import execute_playwright_task
 from services.report_service import create_excel_report
 from utils import updater
 from utils.logger import Logger
+from config.config import APP_VERSION
 
-current_version = 'v0.2.2'  # Versão atual do aplicativo
+current_version = APP_VERSION  # Versão atual do aplicativo
 
 logger = Logger.get_logger()  # Obter o logger configurado
 
@@ -150,4 +151,4 @@ if __name__ == '__main__':
         pass
 
     # Executa a aplicação principal
-    main(headless=False)
+    main(headless=True)
