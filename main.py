@@ -12,19 +12,19 @@ import itertools
 from openpyxl import Workbook
 from datetime import datetime
 
-# Configurar paths do projeto
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'utils'))
-from paths import setup_project_paths, PROJECT_ROOT
-setup_project_paths()
+# Configurar o diretório raiz do projeto
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, PROJECT_ROOT)
 
-from login_canaime import LoginApp
-from canaime_service import CanaimeLogin
-from data_processor import UnitProcessor
-import updater
-from logger import Logger
-from config import APP_VERSION
-from excel_config_sei import generate_unit_sei_sheet
-from excel_config_control import generate_unit_control_sheet, calculate_shift
+# Importações absolutas
+from gui.login.login_canaime import LoginApp
+from services.canaime_service import CanaimeLogin
+from data.data_processor import UnitProcessor
+from utils.updater import check_and_update
+from utils.logger import Logger
+from config.config import APP_VERSION
+from config.excel_config_sei import generate_unit_sei_sheet
+from config.excel_config_control import generate_unit_control_sheet, calculate_shift
 
 # Configurar o logger para não mostrar dados sensíveis
 logger = Logger.get_logger()
@@ -185,7 +185,7 @@ def main(headless=True):
 
     if not args.skip_update:
         try:
-            if not updater.check_and_update(APP_VERSION):
+            if not check_and_update(APP_VERSION):
                 logger.info("O status de atualização automática: Nenhuma atualização disponível")
         except Exception as e:
             logger.error(f"Erro ao verificar atualizações: {e}")
