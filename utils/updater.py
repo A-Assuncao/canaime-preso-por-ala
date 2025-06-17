@@ -4,7 +4,13 @@ from packaging import version
 from urllib.parse import urljoin
 import tkinter as tk
 from tkinter import messagebox
-from .logger import Logger
+import sys
+
+# Define o diretório base deste arquivo
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+
+from logger import Logger
 
 # Configurações
 UPDATE_URL = 'https://github.com/A-Assuncao/canaime-preso-por-ala/releases/latest/download/'
@@ -77,7 +83,6 @@ def check_and_update(current_version):
 
         # Reiniciar o aplicativo com a nova versão
         import subprocess
-        import sys
         try:
             subprocess.Popen(update_path, shell=True)
             sys.exit(0)

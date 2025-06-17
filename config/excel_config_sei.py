@@ -1,10 +1,13 @@
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 import os
-from config.units_config import UNITS_CONFIG
+import sys
 
-# Define o diretório base relativo à localização do arquivo atual
+# Define o diretório base deste arquivo
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+
+from units_config import UNITS_CONFIG
 
 
 def load_units_config():
@@ -294,6 +297,6 @@ if __name__ == "__main__":
     control_sheet = generate_unit_sei_sheet(workbook, unit_name)  # Agora recebe o 'sheet' diretamente
 
     # Transformar o caminho do arquivo em absoluto
-    output_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Modelo_SEI.xlsx')
+    output_file = os.path.join(BASE_DIR, 'Modelo_SEI.xlsx')
     workbook.save(output_file)
 
