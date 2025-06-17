@@ -1,154 +1,278 @@
-import itertools
 import tkinter as tk
+import argparse
+import sys
+import os
+import traceback
+from tkinter import messagebox, ttk, filedialog
+import logging
+import multiprocessing
 from multiprocessing import Process, Queue, Event
 from queue import Empty
+import itertools
+from openpyxl import Workbook
+from datetime import datetime
 
-from gui.login.login_canaime import executar_login
-from gui.selectors.unit_selector import select_units
-from services.playwright_service import execute_playwright_task
-from services.report_service import create_excel_report
-from utils import updater
-from utils.logger import Logger
-from config.config import APP_VERSION
+# Configurar paths do projeto
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'utils'))
+from paths import setup_project_paths, PROJECT_ROOT
+setup_project_paths()
 
-current_version = APP_VERSION  # Versão atual do aplicativo
+from login_canaime import LoginApp
+from canaime_service import CanaimeLogin
+from data_processor import UnitProcessor
+import updater
+from logger import Logger
+from config import APP_VERSION
+from excel_config_sei import generate_unit_sei_sheet
+from excel_config_control import generate_unit_control_sheet, calculate_shift
 
-logger = Logger.get_logger()  # Obter o logger configurado
+# Configurar o logger para não mostrar dados sensíveis
+logger = Logger.get_logger()
 
-
-def process_task(headless, queue, stop_event, login, password, selected_units, use_https):
-    """
-    Função para ser executada no processo separado, executa as tarefas necessárias usando Playwright.
-    """
+def process_task(headless, queue, stop_event, login, password):
+    """Função para ser executada no processo separado, executa as tarefas necessárias usando requests."""
     try:
-        # Execute Playwright tasks e obtenha os dados
-        all_units_data = execute_playwright_task(headless, login, password, selected_units, use_https)
-        queue.put("Processo Completo.")
+        queue.put(("log", "Iniciando o login..."))
+        canaime_login_service = CanaimeLogin(headless=headless, login=login, password=password)
+        session, _ = canaime_login_service.perform_login()
+        queue.put(("log", "Login foi bem sucedido"))
 
-        if all_units_data:
-            # Verificar se há dados para cada unidade
-            if any(len(unit_data) > 0 for unit_data in all_units_data.values()):
-                create_excel_report(all_units_data)
-                queue.put("Arquivo salvo com sucesso.")
-            else:
-                queue.put("Nenhum dado válido encontrado para gerar o relatório.")
-        else:
-            queue.put("Nenhum dado processado.")
-    except Exception as e:
-        queue.put(f"Erro: {str(e)}")
-    finally:
-        stop_event.set()  # Sinaliza que o processo terminou
+        selected_unit = "PAMC"
+        queue.put(("log", "Iniciando a lista da PAMC..."))
 
-
-class StatusApp:
-    def __init__(self, root, headless, login, password, selected_units, use_https):
-        self.root = root
-        self.headless = headless
-        self.login = login
-        self.password = password
-        self.selected_units = selected_units
-        self.use_https = use_https
-        self.frames = itertools.cycle(["◐", "◓", "◑", "◒"])
-        self.queue = Queue()  # Fila para comunicação entre processos
-        self.stop_event = Event()  # Evento para sinalizar a parada do processo
-
-        self.root.title("Status")
-        largura_janela = 300
-        altura_janela = 60
-        largura_tela = self.root.winfo_screenwidth()
-        altura_tela = self.root.winfo_screenheight()
-        pos_x = (largura_tela - largura_janela) // 2
-        pos_y = (altura_tela - altura_janela) // 2
-        self.root.geometry(f"{largura_janela}x{altura_janela}+{pos_x}+{pos_y}")
-        self.root.attributes('-topmost', True)
-
-        self.label_status = tk.Label(root, text="")
-        self.label_status.pack(pady=10)
-
-        self.rodando = True
-        self.iniciar_animacao()
-        self.root.after(100, self.executar_tarefas)
-
-        self.root.protocol("WM_DELETE_WINDOW", self.fechar)
-
-    def iniciar_animacao(self):
-        self.root.after(0, self.animar_bolinha)
-
-    def animar_bolinha(self):
-        if not self.rodando:
-            return
-        frame = next(self.frames)
-        self.label_status.config(text=f"Executando ações... {frame}")
-        self.root.after(200, self.animar_bolinha)
-
-    def executar_tarefas(self):
-        p = Process(target=process_task,
-                    args=(self.headless, self.queue, self.stop_event, self.login, self.password, self.selected_units, self.use_https))
-        p.start()
-        self.root.after(100, self.verificar_fila)
-
-    def verificar_fila(self):
-        if not self.stop_event.is_set():
+        unit_processor = UnitProcessor(session)
+        unit_list_processed = unit_processor.create_unit_list(selected_unit)
+        
+        # Não logar a lista completa, apenas continuar o processo
+        num_records = len(unit_list_processed.get(selected_unit, []))
+        queue.put(("log", f"Processados {num_records} registros da PAMC"))
+        
+        # Criar workbook para o Excel
+        workbook = Workbook()
+        # Remover a aba padrão
+        default_sheet = workbook.active
+        workbook.remove(default_sheet)
+        
+        # Importar as funções necessárias do report_service
+        from report_service import calculate_data, fill_control_sheet, fill_sei_sheet
+        import pandas as pd
+        
+        queue.put(("log", "Preenchendo a aba Controle no excel..."))
+        # Gerar aba Controle
+        try:
+            control_ws = generate_unit_control_sheet(workbook, selected_unit)
+            
+            # Converter dados para DataFrame e calcular
+            if unit_list_processed.get(selected_unit):
+                df = pd.DataFrame(unit_list_processed[selected_unit])
+                calculated_data = calculate_data(df)
+                # Preencher a aba de controle com os dados calculados
+                fill_control_sheet(control_ws, calculated_data)
+                
+        except Exception as e:
+            logger.error(f"Erro ao gerar aba Controle: {e}", exc_info=True)
+            queue.put(("error", f"Erro ao gerar aba Controle: {e}", traceback.format_exc()))
+            raise
+        
+        queue.put(("log", "Preenchendo a aba SEI no excel..."))
+        # Gerar aba SEI
+        try:
+            sei_ws = generate_unit_sei_sheet(workbook, selected_unit)
+            # Preencher a aba SEI com dados da aba Controle
+            fill_sei_sheet(sei_ws, control_ws)
+            
+        except Exception as e:
+            logger.error(f"Erro ao gerar aba SEI: {e}", exc_info=True)
+            queue.put(("error", f"Erro ao gerar aba SEI: {e}", traceback.format_exc()))
+            raise
+        
+        queue.put(("log", "Salvando arquivo excel..."))
+        # Salvar arquivo Excel
+        try:
+            # Gerar o nome do arquivo com o formato: plantao ddmmaaaa_HHmm.xlsx
+            current_date = datetime.now()
+            shift_name = calculate_shift(current_date)
+            formatted_date = current_date.strftime("%d%m%Y_%H%M")
+            filename = f"{shift_name} {formatted_date}.xlsx"
+            
+            # Criar uma janela temporária para o filedialog
+            temp_root = tk.Tk()
+            temp_root.withdraw()  # Esconder a janela principal
+            temp_root.attributes('-topmost', True)  # Sempre em primeiro plano
+            temp_root.lift()  # Trazer para frente
+            temp_root.focus_force()  # Forçar o foco
+            
+            # Mostrar caixa de diálogo para escolher onde salvar
+            output_path = filedialog.asksaveasfilename(
+                parent=temp_root,
+                title="Salvar planilha como",
+                defaultextension=".xlsx",
+                filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                initialfile=filename
+            )
+            
+            # Destruir a janela temporária
+            temp_root.destroy()
+            
+            if not output_path:  # Usuário cancelou
+                queue.put(("error", "Salvamento cancelado pelo usuário", ""))
+                return
+            
+            # Verificar se o workbook tem abas antes de salvar
+            if len(workbook.worksheets) == 0:
+                raise Exception("Workbook não possui abas válidas")
+            
+            # Garantir que a extensão seja .xlsx
+            if not output_path.lower().endswith('.xlsx'):
+                output_path += '.xlsx'
+            
+            # Salvar o arquivo
             try:
-                message = self.queue.get_nowait()
-                self.atualizar_status(message)
-            except Empty:
-                logger.debug("Fila vazia, aguardando novas mensagens.")
-            except Exception as e:
-                logger.error(f"Erro ao verificar a fila: {e}", exc_info=True)
-            finally:
-                self.root.after(100, self.verificar_fila)
-        else:
-            self.rodando = False
-            self.fechar()
+                workbook.save(output_path)
+                
+            except PermissionError:
+                # Se houver erro de permissão, tentar salvar com nome diferente
+                base_path = output_path.rsplit('.', 1)[0]
+                counter = 1
+                while True:
+                    alternative_path = f"{base_path}_{counter}.xlsx"
+                    try:
+                        workbook.save(alternative_path)
+                        output_path = alternative_path
+                        break
+                    except PermissionError:
+                        counter += 1
+                        if counter > 10:  # Limite de tentativas
+                            raise Exception("Não foi possível salvar o arquivo após várias tentativas")
+            
+            # Verificar se o arquivo foi criado e não está vazio
+            if not os.path.exists(output_path):
+                raise Exception("Arquivo não foi criado")
+            
+            file_size = os.path.getsize(output_path)
+            if file_size == 0:
+                raise Exception("Arquivo criado está vazio")
+            elif file_size < 5000:  # Arquivo muito pequeno pode indicar problema
+                queue.put(("log", f"AVISO: Arquivo pode estar corrompido (tamanho: {file_size} bytes)"))
+            
+            queue.put(("log", f"Arquivo salvo como: {os.path.basename(output_path)} ({file_size} bytes)"))
+        except Exception as e:
+            logger.error(f"Erro ao salvar arquivo Excel: {e}", exc_info=True)
+            queue.put(("error", f"Erro ao salvar arquivo Excel: {e}", traceback.format_exc()))
+            raise
+        
+        queue.put(("success", "Processamento concluído com sucesso!"))
+        
+        # Sinal para encerrar completamente a aplicação
+        queue.put(("exit_app", "Encerrando aplicação..."))
+        stop_event.set()
 
-    def atualizar_status(self, mensagem):
-        self.label_status.config(text=mensagem)
-
-    def fechar(self):
-        self.rodando = False
-        self.root.withdraw()
-        self.root.quit()
-
-
-def main(headless: bool = True) -> None:
-    logger.info("Aplicação iniciada.")
-    login, password, use_https = executar_login()
-    if not login or not password:
-        logger.warning("Login não efetuado. Encerrando.")
-        return
-
-    selected_units = select_units()
-    logger.debug(f"Unidades selecionadas: {selected_units}")
-
-    if not selected_units:
-        logger.warning("Nenhuma unidade selecionada. Encerrando.")
-        return
-
-    try:
-        root = tk.Tk()
-        StatusApp(root, headless, login, password, selected_units, use_https)
-        root.mainloop()
     except Exception as e:
-        logger.error(f"Erro durante o main loop: {str(e)}", exc_info=True)
+        error_message = f"Erro durante o processo: {e}"
+        logger.error(error_message, exc_info=True)
+        queue.put(("error", str(e), traceback.format_exc()))
     finally:
-        logger.info("Aplicação finalizada.")
+        queue.put(("log", "Finalizando processo..."))
+        stop_event.set()
 
+def main(headless=True):
+    """Função principal para executar a aplicação."""
+    logger.info("Iniciando a aplicação Canaimé...")
 
-if __name__ == '__main__':
-    import multiprocessing
-    import sys
+    parser = argparse.ArgumentParser(description="Canaimé Application")
+    parser.add_argument("--skip-update", action="store_true", help="Skip the update check on startup")
+    args = parser.parse_args()
 
-    multiprocessing.freeze_support()
+    if not args.skip_update:
+        try:
+            if not updater.check_and_update(APP_VERSION):
+                logger.info("O status de atualização automática: Nenhuma atualização disponível")
+        except Exception as e:
+            logger.error(f"Erro ao verificar atualizações: {e}")
 
+    login_app = None
     try:
-        logger.info("Verificando atualizações.")
-        if updater.check_and_update(current_version):
-            logger.info("Aplicação atualizada. Reiniciando.")
-            sys.exit(0)
-    except Exception as e:
-        logger.error(f"Erro ao verificar atualizações: {e}")
-        pass
+        login_root = tk.Tk()
+        login_app = LoginApp(login_root, headless=headless, process_task_func=process_task)
+        login_root.mainloop()
 
-    # Executa a aplicação principal
-    main(headless=True)
+    except Exception as e:
+        error_message = f"Ocorreu um erro inesperado: {e}"
+        logger.critical(error_message, exc_info=True)
+        show_error_popup(error_message, traceback.format_exc())
+    finally:
+        # Garantir que o programa seja encerrado completamente
+        sys.exit(0)
+
+def show_error_popup(error_message, traceback_text):
+    """Exibe uma janela de popup com a mensagem de erro e o traceback."""
+    error_window = tk.Toplevel()
+    error_window.title("Erro no Programa")
+    error_window.geometry("600x400")
+    error_window.attributes('-topmost', True)
+    error_window.configure(bg='#1b2838')
+
+    title_label = tk.Label(
+        error_window,
+        text="Um Erro Ocorreu!",
+        font=('Segoe UI', 16, 'bold'),
+        bg='#1b2838',
+        fg='#e74c3c'
+    )
+    title_label.pack(pady=10)
+
+    msg_label = tk.Label(
+        error_window,
+        text=error_message,
+        font=('Segoe UI', 10),
+        bg='#1b2838',
+        fg='#ffffff',
+        wraplength=550
+    )
+    msg_label.pack(pady=5)
+
+    traceback_frame = tk.Frame(error_window, bg='#2b3a4a', bd=1, relief="solid")
+    traceback_frame.pack(padx=20, pady=10, fill='both', expand=True)
+
+    traceback_text_widget = tk.Text(
+        traceback_frame,
+        wrap='word',
+        font=('Consolas', 9),
+        bg='#2b3a4a',
+        fg='#e74c3c',
+        relief='flat',
+        bd=0,
+        insertbackground='#ffffff'
+    )
+    traceback_text_widget.insert(tk.END, traceback_text)
+    traceback_text_widget.config(state='disabled')
+    traceback_text_widget.pack(side='left', fill='both', expand=True)
+
+    scrollbar = tk.Scrollbar(traceback_frame, command=traceback_text_widget.yview)
+    scrollbar.pack(side='right', fill='y')
+    traceback_text_widget.config(yscrollcommand=scrollbar.set)
+
+    def copy_to_clipboard():
+        error_window.clipboard_clear()
+        error_window.clipboard_append(traceback_text)
+        messagebox.showinfo("Copiado", "Erro copiado para a área de transferência!", parent=error_window)
+
+    copy_button = tk.Button(
+        error_window,
+        text="Copiar Erro",
+        font=('Segoe UI', 10, 'bold'),
+        bg='#3498db',
+        fg='white',
+        relief='flat',
+        cursor='hand2',
+        command=copy_to_clipboard,
+        activebackground='#287bb8'
+    )
+    copy_button.pack(pady=10)
+
+    error_window.grab_set()
+    error_window.wait_window()
+
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    main(headless=False)

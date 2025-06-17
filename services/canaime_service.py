@@ -1,61 +1,123 @@
-from playwright.sync_api import Page, TimeoutError
-from utils.logger import Logger
+import requests
+from bs4 import BeautifulSoup
+import logging
+import os
+import sys
+from dotenv import load_dotenv
+from pathlib import Path
+import urllib3
+
+# Configurar paths do projeto
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
+from logger import Logger
 
 logger = Logger.get_logger()
 
+# Carrega variáveis de ambiente
+load_dotenv()
+load_dotenv(Path(__file__).parents[2] / ".env")
+
 class CanaimeLogin:
-    def __init__(self, p, headless=True, login='', password='', use_https=True):
-        self.p = p
-        self.headless = headless
-        self.login = login
-        self.password = password
-        self.use_https = use_https
-        self.browser = None
-        self.page = None
+    def __init__(self, headless=True, login='', password=''):
+        self.login = login or os.getenv("CANAIME_USER", "")
+        self.password = password or os.getenv("CANAIME_PASSWORD", "")
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        })
+        # Desabilitar verificação SSL para permitir certificados expirados
+        self.session.verify = False
+        
+        # Suprimir avisos de requests sobre verificação SSL desabilitada
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        self._logged_in = False
 
-    def perform_login(self) -> (Page, object):
+    def perform_login(self):
+        """
+        Realiza o login no sistema Canaimé usando requests
+        
+        Returns:
+            tuple: (session, None) - Mantém a mesma interface do código anterior
+        """
         try:
-            self.browser = self.p.chromium.launch(headless=self.headless)
-            context = self.browser.new_context(java_script_enabled=False)
-            context.set_extra_http_headers(
-                {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"})
-            context.route("**/*",
-                          lambda route: route.abort() if route.request.resource_type == "image" else route.continue_())
-
-            self.page = context.new_page()
-            protocol = 'https' if self.use_https else 'http'
-            url = f'{protocol}://canaime.com.br/sgp2rr/login/login_principal.php'
+            url = 'https://canaime.com.br/sgp2rr/login/login_principal.php'
+            logger.info(f"Tentando acessar {url} (verificação SSL desabilitada)")
             
-            try:
-                logger.info(f"Tentando acessar {url}")
-                self.page.goto(url, timeout=30000)  # 30 segundos de timeout
-            except TimeoutError:
-                logger.error(f"Timeout ao tentar acessar {url}")
-                raise Exception(f"O site demorou muito para responder. Verifique sua conexão ou tente novamente mais tarde.")
-            except Exception as e:
-                logger.error(f"Erro ao acessar {url}: {str(e)}", exc_info=True)
-                raise Exception(f"Não foi possível acessar o site. Verifique sua conexão ou tente usar HTTP se o certificado estiver expirado.")
+            # Primeiro, obtém os cookies iniciais
+            response = self.session.get(url, verify=False)
+            response.raise_for_status()
+            logger.info(f"Obteve resposta inicial com status: {response.status_code}")
+            
+            # Prepara os dados de login
+            login_data = {
+                'usuario': self.login,
+                'senha': self.password
+            }
+            
+            # Realiza o login
+            logger.info(f"Realizando login com usuário: {self.login}")
+            login_response = self.session.post(url, data=login_data, allow_redirects=True, verify=False)
+            login_response.raise_for_status()
+            logger.info(f"Resposta do login: status={login_response.status_code}, url={login_response.url}")
+            
+            # Verifica se o login foi bem-sucedido
+            # Vamos verificar se ainda estamos na página de login ou se há mensagem de erro
+            if "login_principal.php" in login_response.url and "Usuário ou senha inválidos" in login_response.text:
+                logger.error("Falha no login. Verificação de credenciais falhou.")
+                raise Exception("Falha no login. Verifique suas credenciais.")
+            
+            # Se chegamos aqui, assumimos que o login foi bem-sucedido
+            self._logged_in = True
+            logger.info("Login realizado com sucesso")
+            
+            # Retorna a sessão e None para manter compatibilidade com a interface anterior
+            return self.session, None
 
-            try:
-                self.page.locator("input[name=\"usuario\"]").click()
-                self.page.locator("input[name=\"usuario\"]").fill(self.login)
-                self.page.locator("input[name=\"senha\"]").fill(self.password)
-                self.page.locator("input[name=\"senha\"]").press("Enter")
-            except Exception as e:
-                logger.error(f"Erro ao preencher formulário de login: {str(e)}", exc_info=True)
-                raise Exception("Não foi possível preencher o formulário de login. O site pode estar com problemas.")
-
-            return self.page, self.browser  # Retorna a página e o navegador
-
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Erro ao realizar login: {e}")
+            raise Exception(f"Erro ao acessar o sistema: {str(e)}")
         except Exception as e:
-            if self.browser:
-                self.browser.close()
-            raise e
+            logger.error(f"Erro durante o login: {e}")
+            raise
 
     def close_browser(self):
         """
-        Fecha o navegador explicitamente quando não for mais necessário.
+        Método mantido para compatibilidade com a interface anterior.
+        Não é necessário fechar nada quando usando requests.
         """
-        if self.browser:
-            self.browser.close()
-            self.browser = None
+        pass
+
+    def get_page_content(self, url):
+        """
+        Obtém o conteúdo de uma página usando a sessão autenticada
+        
+        Args:
+            url: URL da página a ser acessada
+            
+        Returns:
+            str: Conteúdo HTML da página
+        """
+        if not self._logged_in:
+            raise Exception("É necessário fazer login antes de acessar páginas")
+            
+        try:
+            response = self.session.get(url, verify=False)
+            response.raise_for_status()
+            return response.text
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Erro ao acessar página {url}: {e}")
+            raise Exception(f"Erro ao acessar página: {str(e)}")
+
+    def get_soup(self, url):
+        """
+        Obtém um objeto BeautifulSoup da página
+        
+        Args:
+            url: URL da página a ser acessada
+            
+        Returns:
+            BeautifulSoup: Objeto BeautifulSoup da página
+        """
+        content = self.get_page_content(url)
+        return BeautifulSoup(content, 'html.parser')

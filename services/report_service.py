@@ -3,11 +3,17 @@ import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 from openpyxl.utils import column_index_from_string, get_column_letter
-from config.excel_config_control import generate_unit_control_sheet
-from config.excel_config_sei import generate_unit_sei_sheet
 from tkinter import filedialog, Tk
+import sys
+import os
 
-from utils.logger import Logger
+# Configurar paths do projeto
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config'))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
+
+from excel_config_control import generate_unit_control_sheet
+from excel_config_sei import generate_unit_sei_sheet
+from logger import Logger
 
 logger = Logger.get_logger()
 
