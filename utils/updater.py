@@ -13,7 +13,7 @@ from tkinter import messagebox
 
 # Configurar paths do projeto
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
-from logger import Logger
+from utils.logger import Logger
 
 logger = Logger.get_logger()
 

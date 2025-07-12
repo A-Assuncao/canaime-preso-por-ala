@@ -9,9 +9,9 @@ import logging
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config'))
 
-from resource_manager import resource_path
-from units_config import UNITS_CONFIG
-from logger import Logger
+from utils.resource_manager import resource_path
+from config.units_config import UNITS_CONFIG
+from utils.logger import Logger
 
 # Configurar o logger
 logger = Logger.get_logger()

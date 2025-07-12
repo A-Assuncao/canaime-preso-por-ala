@@ -11,9 +11,9 @@ import os
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config'))
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
 
-from excel_config_control import generate_unit_control_sheet
-from excel_config_sei import generate_unit_sei_sheet
-from logger import Logger
+from config.excel_config_control import generate_unit_control_sheet
+from config.excel_config_sei import generate_unit_sei_sheet
+from utils.logger import Logger
 
 logger = Logger.get_logger()
 

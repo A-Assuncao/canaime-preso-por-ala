@@ -22,10 +22,10 @@ if config_path not in sys.path:
     sys.path.append(config_path)
 
 try:
-    from paths import setup_project_paths
+    from utils.paths import setup_project_paths
     setup_project_paths()
     from config.config import APP_VERSION
-    from logger import Logger
+    from utils.logger import Logger
 except ImportError as e:
     # Fallback para definições básicas
     from config.config import APP_VERSION

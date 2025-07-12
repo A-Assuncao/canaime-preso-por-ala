@@ -66,7 +66,7 @@ def process_task(headless, queue, stop_event, login, password):
         workbook.remove(default_sheet)
         
         # Importar as funções necessárias do report_service
-        from report_service import calculate_data, fill_control_sheet, fill_sei_sheet
+        from services.report_service import calculate_data, fill_control_sheet, fill_sei_sheet
         import pandas as pd
         
         queue.put(("log", "Preenchendo a aba Controle no excel..."))
