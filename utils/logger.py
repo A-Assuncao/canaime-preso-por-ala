@@ -5,7 +5,15 @@ import platform
 import socket
 import psutil
 import os
+import sys
 from datetime import datetime
+
+# Adicionar o diretório do projeto ao path para importações
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from utils.pamc_folder_manager import get_pamc_log_path
 
 class Logger:
     _initialized = False
@@ -24,7 +32,13 @@ class Logger:
 
             # Configurar o manipulador de arquivo
             if log_file_path is None:
-                log_file_path = os.path.join(os.getcwd(), 'app_log.log')
+                try:
+                    # Usar a pasta PAMC como padrão
+                    log_file_path = str(get_pamc_log_path())
+                except Exception as e:
+                    # Fallback para pasta atual se houver problema
+                    log_file_path = os.path.join(os.getcwd(), 'app_log.log')
+                    print(f"Aviso: Não foi possível usar pasta PAMC para logs, usando pasta atual: {e}")
 
             handler = logging.FileHandler(log_file_path, encoding='utf-8')
             handler.setLevel(level)

@@ -23,6 +23,7 @@ from services.canaime_service import CanaimeLogin
 from data.data_processor import UnitProcessor
 from utils.updater import check_and_update
 from utils.logger import Logger
+from utils.pamc_folder_manager import ensure_pamc_folder, copy_file_to_pamc
 from config.config import APP_VERSION
 from config.excel_config_sei import generate_unit_sei_sheet
 from config.excel_config_control import generate_unit_control_sheet, calculate_shift
@@ -32,7 +33,6 @@ logger = Logger.get_logger()
 
 def process_task(headless, queue, stop_event, login, password):
     """Função para ser executada no processo separado, executa as tarefas necessárias usando requests."""
-    validation_error_occurred = False
     try:
         queue.put(("log", "Iniciando o login..."))
         canaime_login_service = CanaimeLogin(headless=headless, login=login, password=password)
@@ -52,7 +52,7 @@ def process_task(headless, queue, stop_event, login, password):
             # Aguardar um pouco para garantir que a mensagem seja processada
             import time
             time.sleep(0.5)
-            validation_error_occurred = True
+            # NÃO definir stop_event.set() aqui - deixar a interface processar a mensagem
             return
         
         # Não logar a lista completa, apenas continuar o processo
@@ -168,6 +168,13 @@ def process_task(headless, queue, stop_event, login, password):
                 queue.put(("log", f"AVISO: Arquivo pode estar corrompido (tamanho: {file_size} bytes)"))
             
             queue.put(("log", f"Arquivo salvo como: {os.path.basename(output_path)} ({file_size} bytes)"))
+            
+            # Copiar o arquivo para a pasta PAMC
+            try:
+                pamc_copy_path = copy_file_to_pamc(output_path)
+                queue.put(("log", f"Cópia salva em: {pamc_copy_path}"))
+            except Exception as e:
+                queue.put(("log", f"AVISO: Não foi possível salvar cópia na pasta PAMC: {e}"))
         except Exception as e:
             logger.error(f"Erro ao salvar arquivo Excel: {e}", exc_info=True)
             queue.put(("error", f"Erro ao salvar arquivo Excel: {e}", traceback.format_exc()))
@@ -189,15 +196,28 @@ def process_task(headless, queue, stop_event, login, password):
         # Não continuar com o finally até que o erro seja processado
         return
     finally:
-        if not validation_error_occurred:
-            queue.put(("log", "Finalizando processo..."))
+        queue.put(("log", "Finalizando processo..."))
         stop_event.set()
 
 def main(headless=True):
     """Função principal para executar a aplicação."""
-    # Iniciar a sessão do logger
+    # Garantir que a pasta PAMC existe ANTES de inicializar o logger
+    try:
+        pamc_folder = ensure_pamc_folder()
+        print(f"Pasta PAMC criada/verificada com sucesso: {pamc_folder}")
+    except Exception as e:
+        print(f"Erro ao criar pasta PAMC: {e}")
+    
+    # Iniciar a sessão do logger (que agora usará a pasta PAMC)
     Logger.start_session()
+    logger = Logger.get_logger()
     logger.info("Iniciando a aplicação Canaimé...")
+    
+    # Log da verificação da pasta PAMC
+    try:
+        logger.info(f"Pasta PAMC verificada: {pamc_folder}")
+    except:
+        logger.info("Pasta PAMC criada com sucesso")
 
     parser = argparse.ArgumentParser(description="Canaimé Application")
     parser.add_argument("--skip-update", action="store_true", help="Skip the update check on startup")

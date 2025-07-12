@@ -246,6 +246,8 @@ class LoginApp:
         # Resetar referências de janelas de erro
         self._login_error_window = None
         self._validation_error_window = None
+        # CRÍTICO: Resetar o process_stop_event para novo processo
+        self.process_stop_event.clear()
             
         username = self.username_entry.get()
         password = self.password_entry.get()
@@ -328,6 +330,8 @@ class LoginApp:
                     self.show_validation_error(message_content[0], message_content[1])
                     # Marcar como finalizado APÓS exibir a janela
                     self.process_finalized = True
+                    # Definir stop_event APÓS processar a mensagem (similar ao erro de login)
+                    self.process_stop_event.set()
                 elif message_type == "status":
                     # Mensagem de status sem ser log
                     self.add_status_message(message_content[0])
