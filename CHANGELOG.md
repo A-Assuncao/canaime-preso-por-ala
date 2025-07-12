@@ -5,6 +5,132 @@ Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [v1.0.2] - 2025-01-12
+
+### Corrigido
+- **CRÍTICO**: Correção na exibição de janela de erro para presos não mapeados
+  - Problema onde mensagens de validation_error não chegavam na interface
+  - Processo filho terminava antes da mensagem ser processada
+  - Adicionado delay de 500ms após envio da mensagem para garantir processamento
+  - Corrigido flag de finalização para evitar duplicação de mensagens
+- **INTERFACE**: Remoção de logs indesejados de contagem regressiva
+  - Removidas mensagens "Processo terminou, aguardando mensagens pendentes..."
+  - Logs mais limpos e menos verbosos durante finalização
+- **VALIDAÇÃO**: Melhorias na depuração do sistema de validação
+  - Adicionados logs de debug para rastrear criação de janelas de erro
+  - Melhor rastreamento do fluxo de mensagens entre processos
+  - Forçar foco na janela principal antes de criar popups
+
+### Melhorado
+- **SISTEMA DE MENSAGENS**: Timing aprimorado na comunicação entre processos
+- **EXPERIÊNCIA DO USUÁRIO**: Interface mais responsiva durante erros de validação
+- **LOGS**: Sistema de logging mais limpo e focado
+
+### Técnico
+- Refatoração da lógica de finalização de processos
+- Melhoria no sistema de comunicação via Queue entre processos
+- Correção na ordem de execução das funções de validação
+- Implementação de flags de controle para evitar duplicação de mensagens
+
+### Arquivos Modificados
+- `main.py` - Correção no timing de mensagens validation_error e flags de controle
+- `gui/login/login_canaime.py` - Remoção de logs indesejados e melhorias na depuração
+
+## [v1.0.1] - 2025-01-12
+
+### Adicionado
+- Sistema de separação visual no log com separadores de sessão
+- Informações detalhadas de início e fim de cada execução do programa
+- Separação automática entre diferentes execuções do programa
+- Informações de versão, sistema operacional e usuário no início da sessão
+- Função `section_separator()` para criar separadores visuais em seções importantes
+- Formato de timestamp melhorado com milissegundos (dd/mm/aaaa HH:mm:ss,mmm)
+- **SEGURANÇA**: Sistema de variáveis de ambiente para dados sensíveis
+- Arquivo `.env` para configuração de credenciais e URLs
+- Arquivo `.env.example` como template de configuração
+- Proteção de dados sensíveis (webhook Discord, URLs do sistema)
+- **VALIDAÇÃO**: Sistema de validação de presos não mapeados
+- Janela de erro detalhada para presos não mapeados
+- Funcionalidade de copiar lista de presos não mapeados
+- Interrupção do programa quando presos não mapeados são encontrados
+
+### Corrigido
+- **CRÍTICO**: Correção na detecção de login mal-sucedido
+  - Sistema agora detecta corretamente quando credenciais estão incorretas
+  - Verifica URL final correta (`index_areas.php` para login bem-sucedido)
+  - Evita geração de planilhas vazias com valores "0" quando login falha
+  - Adiciona múltiplas verificações de segurança para autenticação
+- **CRÍTICO**: Correção de logs duplicados
+  - Padronização do uso do Logger personalizado em todos os módulos
+  - Remoção de handlers duplicados no logger
+  - Correção do `data_processor.py` para usar Logger personalizado
+  - Limpeza automática de handlers existentes na inicialização
+
+### Melhorado
+- Sistema de logging centralizado e padronizado
+- Detecção de erros de login mais robusta e informativa
+- Mensagens de erro mais claras e específicas para o usuário
+- Estrutura de logs mais organizada e legível
+- Separação visual simplificada (apenas uma linha de `=` antes do início)
+- **SEGURANÇA**: Remoção de dados hardcoded do código fonte
+- Configuração flexível via variáveis de ambiente
+- Documentação completa de configuração
+- **VALIDAÇÃO**: Interface de erro mais amigável e informativa
+- Logs detalhados de presos não mapeados
+- Prevenção de planilhas com dados incompletos
+- **INTERFACE**: Janela de erro de login amigável e informativa
+- Mensagens de erro mais claras com ícones e instruções
+- Diferenciação entre erros de login e outros tipos de erro
+- **INTERFACE**: Janelas de erro maiores e centralizadas
+- Melhor aproveitamento do espaço da tela
+- Layout mais proporcional e legível
+
+### Técnico
+- Refatoração do sistema de logging para evitar duplicações
+- Melhoria na arquitetura de detecção de autenticação
+- Padronização de imports e uso do logger em todo o projeto
+- Implementação de verificações múltiplas para validação de login
+- **SEGURANÇA**: Migração de dados sensíveis para variáveis de ambiente
+- Implementação de sistema de configuração via `.env`
+- Proteção contra commit acidental de dados sensíveis
+- **VALIDAÇÃO**: Sistema de validação pré-processamento
+- Interface gráfica para exibição de erros de validação
+- Integração com sistema de mensagens entre processos
+- **INTERFACE**: Sistema de tratamento de erros diferenciado
+- Detecção automática de tipos de erro (login vs outros)
+- Interface gráfica especializada para erros de autenticação
+
+### Arquivos Modificados
+- `services/canaime_service.py` - Correção na detecção de login e URLs via .env
+- `utils/logger.py` - Sistema de separação visual e webhook via .env
+- `data/data_processor.py` - Padronização do logger, URLs via .env e logs detalhados de validação
+- `gui/login/login_canaime.py` - Correção de handlers duplicados, interface de validação e tratamento de erros de login
+- `utils/updater.py` - URL de atualização via .env
+- `main.py` - Integração com sistema de finalização de sessão e validação de presos
+- `.env` - Arquivo de configuração com dados sensíveis
+- `.env.example` - Template de configuração
+- `README.md` - Documentação de configuração e segurança
+
+### Segurança
+- **Webhook Discord**: Movido para variável de ambiente
+- **URLs do Sistema**: Configuráveis via variáveis de ambiente
+- **Credenciais**: Centralizadas no arquivo `.env`
+- **Proteção**: Arquivo `.env` no `.gitignore` para evitar commits acidentais
+- **Flexibilidade**: Configuração adaptável para diferentes ambientes
+
+### Validação
+- **Presos Não Mapeados**: Detecção automática antes do processamento
+- **Interface de Erro**: Janela detalhada com lista formatada
+- **Cópia de Dados**: Funcionalidade para copiar lista de presos não mapeados
+- **Interrupção Segura**: Programa para antes de gerar planilhas incompletas
+- **Logs Detalhados**: Registro completo de presos não mapeados
+
+### Compatibilidade
+- Mantém compatibilidade com versões anteriores
+- Não altera a interface do usuário
+- Preserva todas as funcionalidades existentes
+- Configuração opcional via arquivo `.env`
+
 ## [1.0.0] - 2024-12-18
 
 ### Adicionado

@@ -1,9 +1,9 @@
 import requests
 from bs4 import BeautifulSoup
-import logging
-import os
 import re
+import os
 import sys
+import logging
 
 # Configurar paths do projeto
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
@@ -11,9 +11,10 @@ sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 
 from resource_manager import resource_path
 from units_config import UNITS_CONFIG
+from logger import Logger
 
 # Configurar o logger
-logger = logging.getLogger(__name__)
+logger = Logger.get_logger()
 
 
 class UnitProcessor:
@@ -186,7 +187,8 @@ class UnitProcessor:
         logger.info(f"Iniciando processamento da unidade {unit}...")
 
         # Carregar a página e coletar os elementos necessários
-        url = f'https://canaime.com.br/sgp2rr/areas/impressoes/UND_ChamadaFOTOS_todos2.php?id_und_prisional={unit}'
+        base_url = os.getenv("CANAIME_BASE_URL", "https://canaime.com.br")
+        url = f'{base_url}/sgp2rr/areas/impressoes/UND_ChamadaFOTOS_todos2.php?id_und_prisional={unit}'
         logger.info(f"Acessando URL: {url}")
         
         try:
@@ -255,7 +257,11 @@ class UnitProcessor:
 
         # Log do total de presos não mapeados
         if self.unmapped_count > 0:
-            logger.info(f"Total de {self.unmapped_count} presos não mapeados.")
+            logger.warning(f"ATENÇÃO: {self.unmapped_count} presos não mapeados encontrados!")
+            logger.warning("Lista de presos não mapeados:")
+            for i, prisoner in enumerate(self.unmapped_prisoners, 1):
+                logger.warning(f"  {i}. Código: {prisoner['Código']} | Nome: {prisoner['Nome']} | Ala: {prisoner['Ala']} | Cela: {prisoner['Cela']}")
+            logger.warning("O programa será interrompido para corrigir estes problemas.")
 
         logger.info(f"Processamento concluído. Total de presos processados: {len(mapped_unit_list)}")
         return {unit: mapped_unit_list}

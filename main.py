@@ -11,6 +11,7 @@ from queue import Empty
 import itertools
 from openpyxl import Workbook
 from datetime import datetime
+from config.config import APP_VERSION
 
 # Configurar o diretório raiz do projeto
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +32,7 @@ logger = Logger.get_logger()
 
 def process_task(headless, queue, stop_event, login, password):
     """Função para ser executada no processo separado, executa as tarefas necessárias usando requests."""
+    validation_error_occurred = False
     try:
         queue.put(("log", "Iniciando o login..."))
         canaime_login_service = CanaimeLogin(headless=headless, login=login, password=password)
@@ -42,6 +44,16 @@ def process_task(headless, queue, stop_event, login, password):
 
         unit_processor = UnitProcessor(session)
         unit_list_processed = unit_processor.create_unit_list(selected_unit)
+        
+        # Validar presos não mapeados antes de continuar
+        if unit_processor.unmapped_count > 0:
+            logger.info(f"Enviando erro de validação: {unit_processor.unmapped_count} presos não mapeados")
+            queue.put(("validation_error", "Presos não mapeados encontrados", unit_processor.unmapped_prisoners))
+            # Aguardar um pouco para garantir que a mensagem seja processada
+            import time
+            time.sleep(0.5)
+            validation_error_occurred = True
+            return
         
         # Não logar a lista completa, apenas continuar o processo
         num_records = len(unit_list_processed.get(selected_unit, []))
@@ -169,14 +181,22 @@ def process_task(headless, queue, stop_event, login, password):
 
     except Exception as e:
         error_message = f"Erro durante o processo: {e}"
-        logger.error(error_message, exc_info=True)
+        # Enviar erro imediatamente (sem logar o traceback aqui)
         queue.put(("error", str(e), traceback.format_exc()))
+        # Aguardar um pouco para garantir que a mensagem seja processada
+        import time
+        time.sleep(0.1)
+        # Não continuar com o finally até que o erro seja processado
+        return
     finally:
-        queue.put(("log", "Finalizando processo..."))
+        if not validation_error_occurred:
+            queue.put(("log", "Finalizando processo..."))
         stop_event.set()
 
 def main(headless=True):
     """Função principal para executar a aplicação."""
+    # Iniciar a sessão do logger
+    Logger.start_session()
     logger.info("Iniciando a aplicação Canaimé...")
 
     parser = argparse.ArgumentParser(description="Canaimé Application")
@@ -201,6 +221,8 @@ def main(headless=True):
         logger.critical(error_message, exc_info=True)
         show_error_popup(error_message, traceback.format_exc())
     finally:
+        # Finalizar a sessão do logger antes de encerrar
+        Logger.end_session()
         # Garantir que o programa seja encerrado completamente
         sys.exit(0)
 

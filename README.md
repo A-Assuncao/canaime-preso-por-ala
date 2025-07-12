@@ -1,144 +1,223 @@
-# Canaime Preso por Ala
+# Canaimé - Planilha PAMC
 
-Este projeto tem como objetivo automatizar a coleta de dados de presidiários de diferentes unidades prisionais usando a biblioteca Playwright para navegação automatizada e gerar relatórios detalhados em Excel.
+Sistema automatizado para geração de planilhas PAMC do sistema Canaimé.
 
-**Versão Atual:** v0.2.2
+## Funcionalidades
 
-## Índice
+- **Login automatizado** no sistema Canaimé com detecção robusta de erros
+- **Coleta de dados** da PAMC com processamento otimizado
+- **Geração de planilhas Excel** com abas Controle e SEI automatizadas
+- **Sistema de validação** que detecta presos não mapeados antes do processamento
+- **Interface gráfica moderna** com janelas de erro informativas e amigáveis
+- **Sistema de atualizações automáticas** para manter o programa sempre atualizado
+- **Logs detalhados** com separação visual e informações de sessão completas
+- **Configuração segura** via arquivo `.env` para proteção de credenciais
 
-- [Sobre o Projeto](#sobre-o-projeto)
-- [Requisitos](#requisitos)
-- [Instalação](#instalação)
-- [Uso](#uso)
-- [Atualização do Software](#atualização-do-software)
-- [Estrutura do Projeto](#estrutura-do-projeto)
-- [Contribuição](#contribuição)
-- [Licença](#licença)
+## Sistema de Logs
 
-## Sobre o Projeto
+O sistema agora possui um sistema de logs aprimorado com separação visual clara entre execuções:
 
-O projeto **Canaime Preso por Ala** é uma ferramenta automatizada que:
+### Exemplo de Log
 
-- Realiza login automático no sistema de gerenciamento de presidiários
-- Permite seleção flexível de unidades prisionais para processamento
-- Coleta dados detalhados sobre presos em diferentes alas
-- Gera relatórios organizados em formato Excel
-- Possui interface gráfica amigável para interação com o usuário
-- Inclui sistema de atualização automática
-- Mantém logs detalhados das operações
+```
+================================================================================
+INICIANDO PROGRAMA - 12/01/2025 10:30:15,123
+Versão: v1.0.0
+Sistema: Windows 10.0.19045
+Usuário: usuario123
+2025-01-12 10:30:15,124 - INFO - Iniciando a aplicação Canaimé...
+2025-01-12 10:30:15,125 - INFO - O status de atualização automática: Nenhuma atualização disponível
+2025-01-12 10:30:20,456 - INFO - Iniciando processo de login...
+2025-01-12 10:30:20,457 - INFO - Tentando acessar https://canaime.com.br/sgp2rr/login/login_principal.php (verificação SSL desabilitada)
+2025-01-12 10:30:20,458 - INFO - Iniciando o login...
+2025-01-12 10:30:20,789 - INFO - Obteve resposta inicial com status: 200
+2025-01-12 10:30:20,790 - INFO - Realizando login com usuário: 007msn88
+2025-01-12 10:30:23,123 - INFO - Resposta do login: status=200, url=https://canaime.com.br/sgp2rr/areas/index_areas.php
+2025-01-12 10:30:23,124 - INFO - Login realizado com sucesso
+2025-01-12 10:30:23,125 - INFO - Login foi bem sucedido
+2025-01-12 10:30:23,126 - INFO - Iniciando a lista da PAMC...
+2025-01-12 10:30:35,789 - INFO - Processados 1820 registros da PAMC
+2025-01-12 10:30:35,790 - INFO - Número de presos por cela calculado.
+2025-01-12 10:30:35,791 - INFO - Aba "Controle" preenchida.
+2025-01-12 10:30:35,792 - INFO - Aba "SEI" preenchida.
+2025-01-12 10:30:35,793 - INFO - Preenchendo a aba Controle no excel...
+2025-01-12 10:30:35,794 - INFO - Preenchendo a aba SEI no excel...
+2025-01-12 10:30:35,795 - INFO - Salvando arquivo excel...
+2025-01-12 10:30:42,123 - INFO - Arquivo salvo como: PLANTÃO 12012025_103042.xlsx (156789 bytes)
+2025-01-12 10:30:42,124 - INFO - Encerrando processos em segundo plano...
+2025-01-12 10:30:42,125 - INFO - Encerrando aplicação...
+================================================================================
+FINALIZANDO PROGRAMA - 12/01/2025 10:30:42,126
+================================================================================
+```
 
-O objetivo principal é fornecer uma ferramenta eficiente para monitoramento e análise de dados de detentos, reduzindo o tempo necessário para coleta manual de informações.
+### Características do Sistema de Logs
 
-## Requisitos
+- **Separação Visual**: Linhas de `=` separam cada execução do programa
+- **Timestamp Detalhado**: Formato `dd/mm/aaaa HH:mm:ss,mmm` com milissegundos
+- **Informações de Sessão**: Versão, sistema operacional e usuário no início
+- **Logs Únicos**: Eliminação de mensagens duplicadas
+- **Detecção de Erros**: Logs específicos para falhas de login e outros erros
 
-- Python 3.8 ou superior
-- pip (gerenciador de pacotes do Python)
-- Acesso à internet para baixar pacotes e realizar atualizações
+## Sistema de Validação
+
+O sistema agora inclui validação automática de presos não mapeados:
+
+### Validação de Presos Não Mapeados
+
+Quando presos são encontrados em alas/celas que não estão configuradas no sistema, o programa:
+
+1. **Detecta automaticamente** os presos não mapeados
+2. **Interrompe o processamento** antes de gerar planilhas incompletas
+3. **Exibe uma janela de erro** detalhada com:
+   - Lista completa de presos não mapeados
+   - Código, nome, ala e cela de cada preso
+   - Botão para copiar a lista completa
+   - Instruções para correção
+
+### Exemplo de Janela de Erro
+
+```
+❌ ERRO DE VALIDAÇÃO
+
+Os seguintes presos não puderam ser mapeados para alas/celas válidas:
+
+PRESOS NÃO MAPEADOS ENCONTRADOS:
+======================================================================
+ 1. Código: 12345    | Nome: João Silva                    | Ala: A01      | Cela: 15
+ 2. Código: 67890    | Nome: Maria Santos                  | Ala: B02      | Cela: 22
+ 3. Código: 11111    | Nome: Pedro Costa                   | Ala: C03      | Cela: 08
+======================================================================
+TOTAL: 3 presos não mapeados
+
+INSTRUÇÕES:
+1. Copie esta lista usando o botão 'Copiar Lista'
+2. Verifique as alas e celas no sistema Canaimé
+3. Atualize a configuração das unidades se necessário
+4. Execute o programa novamente
+
+[📋 Copiar Lista] [❌ Fechar]
+```
+
+### Benefícios da Validação
+
+- **Prevenção de Erros**: Evita planilhas com dados incompletos
+- **Facilita Correção**: Lista clara e copiável dos problemas
+- **Logs Detalhados**: Registro completo no `app_log.log`
+- **Interface Amigável**: Janela de erro informativa e fácil de usar
+- **Funcionamento Garantido**: Sistema corrigido para sempre exibir a janela de erro ao usuário
+
+### Correções Recentes (v1.0.2)
+
+O sistema de validação foi aprimorado para garantir que as janelas de erro sejam sempre exibidas:
+
+- **Correção Crítica**: Resolvido problema onde mensagens de presos não mapeados não chegavam na interface
+- **Timing Aprimorado**: Implementado delay para garantir processamento das mensagens entre processos
+- **Logs Limpos**: Removidas mensagens de contagem regressiva que não agregavam valor
+- **Interface Responsiva**: Melhor experiência do usuário durante erros de validação
 
 ## Instalação
 
-1. Clone este repositório:
+1. Clone o repositório
+2. Instale as dependências: `pip install -r requirements.txt`
+3. Configure as credenciais no arquivo `.env`
+4. Execute: `python main.py`
 
-    ```bash
-    git clone https://github.com/A-Assuncao/canaime-preso-por-ala.git
-    cd canaime-preso-por-ala
-    ```
+## Configuração
 
-2. Crie um ambiente virtual e ative-o:
+### 1. Arquivo .env
 
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # No Windows use `venv\Scripts\activate`
-    ```
+Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
 
-3. Instale as dependências do projeto:
+```env
+# Credenciais do Sistema Canaimé
+CANAIME_USER=seu_usuario_aqui
+CANAIME_PASSWORD=sua_senha_aqui
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+# URLs do Sistema
+CANAIME_BASE_URL=https://canaime.com.br
 
-4. Instale o Playwright e seus navegadores necessários:
+# Webhook do Discord para notificações de erro (opcional)
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/seu_webhook_aqui
 
-    ```bash
-    playwright install
-    ```
+# URL de Atualizações
+UPDATE_URL=https://github.com/A-Assuncao/canaime-preso-por-ala/releases/latest/download/
+```
+
+### 2. Variáveis de Ambiente
+
+- **CANAIME_USER**: Seu usuário do sistema Canaimé
+- **CANAIME_PASSWORD**: Sua senha do sistema Canaimé
+- **CANAIME_BASE_URL**: URL base do sistema (padrão: https://canaime.com.br)
+- **DISCORD_WEBHOOK_URL**: Webhook do Discord para notificações de erro (opcional)
+- **UPDATE_URL**: URL para verificar atualizações automáticas
+
+### 3. Segurança
+
+⚠️ **IMPORTANTE**: 
+- O arquivo `.env` contém dados sensíveis e NÃO deve ser compartilhado
+- O arquivo `.env` já está no `.gitignore` para não ser commitado
+- Use o arquivo `.env.example` como template
 
 ## Uso
 
-1. Execute o script principal para iniciar o programa:
-
-    ```bash
-    python main.py
-    ```
-
-2. Uma interface gráfica será aberta solicitando:
-   - Login e senha do sistema
-   - Seleção das unidades prisionais desejadas
-   - Opção de uso de HTTPS (recomendado)
-
-3. Após confirmar, o programa:
-   - Realizará login no sistema automaticamente
-   - Coletará os dados das unidades selecionadas
-   - Exibirá uma janela de status com progresso em tempo real
-   - Gerará o relatório em Excel automaticamente
-
-4. O relatório será salvo como `Presos por Ala.xlsx` na pasta do projeto.
-
-## Atualização do Software
-
-O projeto inclui um sistema de atualização automática. Ele verifica se há novas versões disponíveis e aplica as atualizações automaticamente.
-
-- Para verificar e aplicar atualizações, basta executar o script principal (`main.py`). Se uma nova versão estiver disponível, o programa será atualizado e reiniciado automaticamente.
+1. Execute o programa
+2. Digite suas credenciais na interface de login
+3. Aguarde o processamento automático
+4. Escolha onde salvar a planilha gerada
 
 ## Estrutura do Projeto
 
-Abaixo está a estrutura atualizada do projeto:
-
 ```
-📦 canaime-preso-por-ala
-│
-├── 📂 config             # Arquivos de configuração e geração de planilhas
-│   ├── excel_config_control.py  # Configurações da aba 'Controle' do Excel
-│   ├── excel_config_sei.py      # Configurações da aba 'SEI' do Excel
-│   └── units_config.py        # Configurações das unidades e alas
-│
-├── 📂 data               # Manipulação e processamento de dados
-│   ├── data_processor.py       # Processa e formata os dados extraídos
-│   └── 📂 processed           # Armazenar dados gerados em tempo de execução
-│
-├── 📂 gui                # Interface gráfica com o usuário
-│   ├── 📂 login                # Componentes relacionados ao login
-│   │   └── login_canaime.py    # Tela de login para o sistema Canaimé
-│   └── 📂 selectors            # Componentes de seleção
-│       └── unit_selector.py    # Seleção de unidades para geração de relatório
-│
-├── 📂 services           # Serviços principais
-│   ├── playwright_service.py   # Executa tarefas usando Playwright
-│   └── report_service.py       # Gera relatórios Excel
-│
-├── 📂 utils              # Utilitários do sistema
-│   ├── logger.py              # Sistema de logging
-│   └── updater.py             # Sistema de atualização automática
-│
-├── .gitignore            # Arquivos e pastas ignoradas pelo Git
-├── LICENSE               # Licença do projeto
-├── main.py               # Ponto de entrada da aplicação
-├── README.md             # Este arquivo
-└── requirements.txt      # Dependências do projeto
+canaime-preso-por-ala/
+├── config/          # Configurações do sistema
+├── data/           # Processamento de dados
+├── gui/            # Interface gráfica
+├── services/       # Serviços de autenticação e relatórios
+├── utils/          # Utilitários e logger
+├── views/          # Visualizações
+├── main.py         # Arquivo principal
+└── requirements.txt # Dependências
 ```
 
-## Contribuição
+## Logs
 
-1. Faça um fork do projeto.
+Todos os logs são salvos em `app_log.log` na raiz do projeto. O sistema agora inclui:
 
-2. Crie uma branch para sua feature (`git checkout -b feature/SuaFeature`).
+- Separação visual entre execuções
+- Informações detalhadas de sessão
+- Detecção aprimorada de erros
+- Logs únicos sem duplicação
 
-3. Commit suas mudanças (`git commit -m 'Adiciona a SuaFeature'`).
+## Troubleshooting
 
-4. Faça um push para a branch (`git push origin feature/SuaFeature`).
+### Problemas Comuns
 
-5. Abra um Pull Request.
+#### Janela de Erro de Validação Não Aparece
+- **Problema**: Presos não mapeados detectados mas janela não é exibida
+- **Solução**: Atualizar para v1.0.2 ou superior - problema foi corrigido
+- **Verificação**: Consultar `app_log.log` para confirmar detecção dos presos não mapeados
 
-## Licença
+#### Logs Muito Verbosos
+- **Problema**: Muitas mensagens de "aguardando mensagens pendentes"
+- **Solução**: Atualizar para v1.0.2 - logs foram limpos e otimizados
+- **Benefício**: Logs mais focados e informativos
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENÇA](LICENSE) para mais detalhes.
+#### Login Não Funciona
+- **Problema**: Credenciais corretas mas login falha
+- **Verificação**: Consultar logs para ver URL de redirecionamento
+- **Solução**: Verificar conectividade e credenciais no arquivo `.env`
+
+#### Presos Não Mapeados
+- **Problema**: Alguns presos não aparecem na planilha final
+- **Solução**: Sistema agora detecta automaticamente e exibe janela de erro
+- **Ação**: Copiar lista da janela de erro e atualizar configuração de unidades
+
+## Suporte
+
+Para suporte técnico ou reportar bugs:
+
+1. **Consulte os logs**: Verifique `app_log.log` para informações detalhadas
+2. **Versão atual**: Certifique-se de estar usando a versão mais recente
+3. **Informações do erro**: Forneça logs completos e descrição do problema
+4. **Configuração**: Verifique se o arquivo `.env` está configurado corretamente

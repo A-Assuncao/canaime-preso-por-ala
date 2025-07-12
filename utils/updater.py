@@ -1,19 +1,24 @@
-import os
 import requests
+import os
+import sys
+import zipfile
+import shutil
+import subprocess
+import platform
+from pathlib import Path
 from packaging import version
 from urllib.parse import urljoin
 import tkinter as tk
 from tkinter import messagebox
-import sys
 
-# Define o diretório base deste arquivo
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(BASE_DIR)
-
+# Configurar paths do projeto
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
 from logger import Logger
 
-# Configurações
-UPDATE_URL = 'https://github.com/A-Assuncao/canaime-preso-por-ala/releases/latest/download/'
+logger = Logger.get_logger()
+
+# URL de atualização
+UPDATE_URL = os.getenv("UPDATE_URL", 'https://github.com/A-Assuncao/canaime-preso-por-ala/releases/latest/download/')
 VERSION_FILE = 'latest_version.txt'
 
 
@@ -82,7 +87,6 @@ def check_and_update(current_version):
         Logger.get_logger().info(f"Atualização baixada: {update_path}")
 
         # Reiniciar o aplicativo com a nova versão
-        import subprocess
         try:
             subprocess.Popen(update_path, shell=True)
             sys.exit(0)

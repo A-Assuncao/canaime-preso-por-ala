@@ -24,16 +24,12 @@ if config_path not in sys.path:
 try:
     from paths import setup_project_paths
     setup_project_paths()
-    from config import APP_VERSION
+    from config.config import APP_VERSION
     from logger import Logger
 except ImportError as e:
     # Fallback para definições básicas
-    APP_VERSION = "v0.2.2"
-    
-    class Logger:
-        @staticmethod
-        def get_logger():
-            return logging.getLogger("CanaimeApp")
+    from config.config import APP_VERSION
+    from utils.logger import Logger
 
 # URL de login do sistema Canaimé (não mais usada diretamente aqui)
 # URL_LOGIN_CANAIME = 'https://canaime.com.br/sgp2rr/login/login_principal.php'
@@ -51,10 +47,16 @@ class LogHandler(logging.Handler):
         self.text_widget.tag_config('debug', foreground='#90ee90') # Light green
 
     def emit(self, record):
-        msg = self.format(record)
-        # Adiciona a mensagem com uma tag baseada no nível do log
-        self.text_widget.insert(tk.END, msg + '\n', record.levelname.lower())
-        self.text_widget.yview(tk.END) # Auto-scroll
+        try:
+            msg = self.format(record)
+            # Verificar se o widget ainda existe antes de tentar escrever
+            if hasattr(self.text_widget, 'winfo_exists') and self.text_widget.winfo_exists():
+                # Adiciona a mensagem com uma tag baseada no nível do log
+                self.text_widget.insert(tk.END, msg + '\n', record.levelname.lower())
+                self.text_widget.yview(tk.END) # Auto-scroll
+        except Exception:
+            # Se houver erro ao escrever no widget, apenas ignorar
+            pass
 
 class LoginApp:
     def __init__(self, root, headless, process_task_func):
@@ -66,6 +68,9 @@ class LoginApp:
         self.process_task_func = process_task_func # Function from main.py to run in separate process
         self.process_queue = Queue() # Queue for communication from child process
         self.process_stop_event = Event() # Event to signal child process to stop
+        self.process_finalized = False  # Flag para evitar finalização duplicada
+        self._login_error_window = None  # Referência para janela de erro de login
+        self._validation_error_window = None  # Referência para janela de erro de validação
 
         self.root.title(f"Planilha PAMC {APP_VERSION}")
         self.root.geometry("400x600")
@@ -202,6 +207,12 @@ class LoginApp:
         # Configurar o handler de log para o status_text
         self.log_handler = LogHandler(self.status_text)
         self.log_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        
+        # Remover handlers existentes do mesmo tipo para evitar duplicação
+        for handler in logger.handlers[:]:
+            if isinstance(handler, LogHandler):
+                logger.removeHandler(handler)
+        
         logger.addHandler(self.log_handler)
 
     def bind_events(self):
@@ -228,6 +239,14 @@ class LoginApp:
         entry.config(highlightbackground="#2B3C57") # Default color when not focused
 
     def iniciar_login(self):
+        # Resetar flags para novo processo
+        self.process_finalized = False
+        if hasattr(self, '_finalization_countdown'):
+            delattr(self, '_finalization_countdown')
+        # Resetar referências de janelas de erro
+        self._login_error_window = None
+        self._validation_error_window = None
+            
         username = self.username_entry.get()
         password = self.password_entry.get()
 
@@ -275,19 +294,40 @@ class LoginApp:
             try:
                 message_type, *message_content = self.process_queue.get_nowait()
                 
+                # Log de debug para verificar mensagens recebidas
+                logger.info(f"Recebida mensagem: {message_type} - {message_content}")
+                
                 if message_type == "log":
                     log_message = message_content[0]
                     logger.info(log_message) # Logs from child process
                     self.add_status_message(log_message)
                 elif message_type == "success":
                     self.login_successful = True
+                    # Resetar countdown pois processamos uma mensagem importante
+                    if hasattr(self, '_finalization_countdown'):
+                        delattr(self, '_finalization_countdown')
                     self.finalizar_processo("Sucesso", message_content[0])
                 elif message_type == "exit_app":
                     # Encerrar completamente a aplicação
                     self.add_status_message(message_content[0])
                     self.root.after(500, self.encerrar_aplicativo)
                 elif message_type == "error":
-                    self.finalizar_processo("Erro", message_content[0], message_content[1])
+                    logger.info(f"Processando erro: {message_content[0]}")
+                    logger.info(f"Traceback: {message_content[1] if len(message_content) > 1 else 'N/A'}")
+                    # Resetar countdown pois processamos uma mensagem importante
+                    if hasattr(self, '_finalization_countdown'):
+                        delattr(self, '_finalization_countdown')
+                    self.finalizar_processo("Erro", message_content[0], message_content[1] if len(message_content) > 1 else None)
+                elif message_type == "validation_error":
+                    logger.info(f"Processando erro de validação: {message_content[0]}")
+                    logger.info(f"Presos não mapeados: {len(message_content[1]) if len(message_content) > 1 else 0}")
+                    # Resetar countdown pois processamos uma mensagem importante
+                    if hasattr(self, '_finalization_countdown'):
+                        delattr(self, '_finalization_countdown')
+                    # Exibir janela de erro de validação ANTES de marcar como finalizado
+                    self.show_validation_error(message_content[0], message_content[1])
+                    # Marcar como finalizado APÓS exibir a janela
+                    self.process_finalized = True
                 elif message_type == "status":
                     # Mensagem de status sem ser log
                     self.add_status_message(message_content[0])
@@ -301,29 +341,175 @@ class LoginApp:
             finally:
                 self.root.after(100, self.verificar_fila)
         else:
-            # Processo terminou, mas pode ter sucesso sem mensagem final ou erro já tratado
-            self.finalizar_processo("", "") # Call to clean up UI
+            # Processo terminou, mas pode ter mensagens pendentes na fila
+            # Aguardar um pouco mais para processar mensagens pendentes
+            if not hasattr(self, '_finalization_countdown'):
+                self._finalization_countdown = 5  # Tentar por 5 ciclos (500ms)
+            
+            if self._finalization_countdown > 0:
+                self._finalization_countdown -= 1
+                self.root.after(100, self.verificar_fila)
+            else:
+                # Após aguardar, finalizar se não houve mensagens importantes
+                if not self.process_finalized:
+                    logger.info("Processo terminou, finalizando UI")
+                    self.finalizar_processo("", "") # Call to clean up UI
+                else:
+                    logger.info("Processo já foi finalizado por mensagem importante")
 
     def finalizar_processo(self, title, message, traceback_text=None):
+        # Evitar finalização duplicada
+        if self.process_finalized:
+            logger.info("Processo já finalizado, ignorando chamada duplicada")
+            return
+            
+        logger.info(f"Finalizando processo: {title} - {message}")
         self.login_button.config(state=tk.NORMAL)
         self.animation_running = False
+        self.process_finalized = True
 
         if title == "Sucesso":
             self.add_status_message(f"SUCESSO: {message}")
             # O encerramento será tratado pelo sinal exit_app
         elif title == "Erro":
-            self.add_status_message(f"ERRO: {message}")
-            if traceback_text:
-                # Mostra o erro detalhado no status
-                self.add_status_message("Detalhes do erro:")
-                self.add_status_message(traceback_text[:500] + "..." if len(traceback_text) > 500 else traceback_text)
+            self.add_status_message(f"❌ ERRO: {message}")
+            logger.info(f"Detectado erro: {message}")
+            
+            # Verificar se é erro de login para exibir janela especial
+            if "login" in message.lower() or "credenciais" in message.lower():
+                logger.info("Exibindo janela de erro de login")
+                self.add_status_message("🔐 Abrindo janela de erro de login...")
+                self.show_login_error(message, traceback_text)
+            else:
+                # Para outros erros, mostrar no status
+                if traceback_text:
+                    self.add_status_message("📋 Detalhes do erro:")
+                    self.add_status_message(traceback_text[:500] + "..." if len(traceback_text) > 500 else traceback_text)
         
         # Remove o handler de log ao finalizar
         if hasattr(self, 'log_handler') and self.log_handler in logger.handlers:
             logger.removeHandler(self.log_handler)
 
+    def show_login_error(self, error_message, traceback_text=None):
+        """Exibe erro de login de forma amigável"""
+        # Verificar se já existe uma janela de erro aberta
+        if hasattr(self, '_login_error_window') and self._login_error_window is not None and self._login_error_window.winfo_exists():
+            logger.info("Janela de erro de login já existe, não criando nova")
+            return
+            
+        logger.info(f"Exibindo janela de erro de login: {error_message}")
+        
+        # Criar janela de erro de login
+        login_error_window = tk.Toplevel(self.root)
+        self._login_error_window = login_error_window  # Guardar referência
+        login_error_window.title("Erro de Login")
+        login_error_window.geometry("700x600")
+        login_error_window.attributes('-topmost', True)
+        login_error_window.configure(bg='#1b2838')
+        
+        # Centralizar a janela na tela
+        login_error_window.update_idletasks()
+        width = login_error_window.winfo_width()
+        height = login_error_window.winfo_height()
+        x = (login_error_window.winfo_screenwidth() // 2) - (width // 2)
+        y = (login_error_window.winfo_screenheight() // 2) - (height // 2)
+        login_error_window.geometry(f'{width}x{height}+{x}+{y}')
+
+        # Título
+        title_label = tk.Label(
+            login_error_window,
+            text="❌ ERRO DE LOGIN",
+            font=('Segoe UI', 16, 'bold'),
+            bg='#1b2838',
+            fg='#e74c3c'
+        )
+        title_label.pack(pady=15)
+
+        # Ícone de erro
+        error_icon = tk.Label(
+            login_error_window,
+            text="🔐",
+            font=('Segoe UI', 48),
+            bg='#1b2838',
+            fg='#e74c3c'
+        )
+        error_icon.pack(pady=10)
+
+        # Mensagem de erro
+        msg_label = tk.Label(
+            login_error_window,
+            text="Falha na autenticação no sistema Canaimé",
+            font=('Segoe UI', 12, 'bold'),
+            bg='#1b2838',
+            fg='#ffffff',
+            wraplength=650
+        )
+        msg_label.pack(pady=10)
+
+        # Detalhes do erro
+        details_label = tk.Label(
+            login_error_window,
+            text=error_message,
+            font=('Segoe UI', 10),
+            bg='#1b2838',
+            fg='#ff6b6b',
+            wraplength=650
+        )
+        details_label.pack(pady=10)
+
+        # Instruções
+        instructions_label = tk.Label(
+            login_error_window,
+            text="Verifique:\n• Usuário e senha estão corretos\n• Conexão com a internet\n• Sistema Canaimé está acessível\n• Credenciais não expiraram",
+            font=('Segoe UI', 10),
+            bg='#1b2838',
+            fg='#ffffff',
+            justify='left',
+            wraplength=650
+        )
+        instructions_label.pack(pady=15)
+
+        # Botão para tentar novamente
+        retry_button = tk.Button(
+            login_error_window,
+            text="🔄 Tentar Novamente",
+            font=('Segoe UI', 12, 'bold'),
+            bg='#3498db',
+            fg='white',
+            relief='flat',
+            cursor='hand2',
+            command=login_error_window.destroy,
+            activebackground='#287bb8',
+            pady=8,
+            padx=20
+        )
+        retry_button.pack(pady=15)
+
+        # Botão para fechar
+        close_button = tk.Button(
+            login_error_window,
+            text="❌ Fechar",
+            font=('Segoe UI', 12, 'bold'),
+            bg='#e74c3c',
+            fg='white',
+            relief='flat',
+            cursor='hand2',
+            command=login_error_window.destroy,
+            activebackground='#c0392b',
+            pady=8,
+            padx=20
+        )
+        close_button.pack(pady=10)
+
+        login_error_window.grab_set()
+        login_error_window.wait_window()
+
     def encerrar_aplicativo(self):
         """Encerra o aplicativo completamente após o sucesso"""
+        # Remover o handler de log para evitar erros de Tkinter
+        if hasattr(self, 'log_handler'):
+            logger.removeHandler(self.log_handler)
+        
         # Ensure the child process is terminated if still running
         if not self.process_stop_event.is_set():
             self.process_stop_event.set()
@@ -345,3 +531,149 @@ class LoginApp:
         self.status_text.insert(tk.END, f"{message}\n")
         self.status_text.see(tk.END)
         self.status_text.config(state='disabled')
+
+    def show_validation_error(self, title, unmapped_prisoners):
+        """Exibe erro de validação com lista de presos não mapeados"""
+        # Verificar se já existe uma janela de erro aberta
+        if hasattr(self, '_validation_error_window') and self._validation_error_window is not None and self._validation_error_window.winfo_exists():
+            logger.info("Janela de erro de validação já existe, não criando nova")
+            return
+            
+        logger.info(f"Iniciando show_validation_error: {title}")
+        logger.info(f"Presos não mapeados recebidos: {len(unmapped_prisoners) if unmapped_prisoners else 0}")
+        
+        self.login_button.config(state=tk.NORMAL)
+        self.animation_running = False
+        
+        # Log adicional para debug
+        logger.info("Criando janela de erro de validação...")
+        
+        # Forçar foco na janela principal antes de criar o popup
+        self.root.lift()
+        self.root.focus_force()
+
+        # Criar janela de erro de validação
+        validation_window = tk.Toplevel(self.root)
+        self._validation_error_window = validation_window  # Guardar referência
+        validation_window.title("Erro de Validação - Presos Não Mapeados")
+        validation_window.geometry("900x800")
+        validation_window.attributes('-topmost', True)
+        validation_window.configure(bg='#1E2C44')
+        
+        logger.info("Janela de erro de validação criada com sucesso")
+        logger.info(f"Título da janela: {validation_window.title()}")
+        logger.info(f"Geometria da janela: {validation_window.geometry()}")
+        
+        # Centralizar a janela na tela
+        validation_window.update_idletasks()
+        width = validation_window.winfo_width()
+        height = validation_window.winfo_height()
+        x = (validation_window.winfo_screenwidth() // 2) - (width // 2)
+        y = (validation_window.winfo_screenheight() // 2) - (height // 2)
+        validation_window.geometry(f'{width}x{height}+{x}+{y}')
+
+        # Título
+        title_label = tk.Label(
+            validation_window,
+            text="❌ ERRO DE VALIDAÇÃO",
+            font=('Segoe UI', 14, 'bold'),
+            bg='#1b2838',
+            fg='#e74c3c'
+        )
+        title_label.pack(pady=10)
+
+        # Mensagem explicativa
+        msg_label = tk.Label(
+            validation_window,
+            text="Os seguintes presos não puderam ser mapeados para alas/celas válidas:",
+            font=('Segoe UI', 10),
+            bg='#1b2838',
+            fg='#ffffff',
+            wraplength=750
+        )
+        msg_label.pack(pady=5)
+
+        # Frame para a lista de presos
+        list_frame = tk.Frame(validation_window, bg='#2b3a4a', bd=1, relief="solid")
+        list_frame.pack(padx=20, pady=10, fill='both', expand=True)
+
+        # Text widget para a lista
+        list_text = tk.Text(
+            list_frame,
+            wrap='word',
+            font=('Consolas', 9),
+            bg='#2b3a4a',
+            fg='#ffffff',
+            relief='flat',
+            bd=0,
+            insertbackground='#ffffff'
+        )
+        list_text.pack(side='left', fill='both', expand=True)
+
+        # Scrollbar
+        scrollbar = tk.Scrollbar(list_frame, command=list_text.yview)
+        scrollbar.pack(side='right', fill='y')
+        list_text.config(yscrollcommand=scrollbar.set)
+
+        # Formatar e inserir a lista de presos
+        formatted_list = []
+        formatted_list.append("PRESOS NÃO MAPEADOS ENCONTRADOS:")
+        formatted_list.append("=" * 70)
+        formatted_list.append("")
+        
+        for i, prisoner in enumerate(unmapped_prisoners, 1):
+            formatted_list.append(f"{i:2d}. Código: {prisoner['Código']:<8} | Nome: {prisoner['Nome']:<30} | Ala: {prisoner['Ala']:<10} | Cela: {prisoner['Cela']}")
+        
+        formatted_list.append("")
+        formatted_list.append("=" * 70)
+        formatted_list.append(f"TOTAL: {len(unmapped_prisoners)} presos não mapeados")
+        formatted_list.append("")
+        formatted_list.append("INSTRUÇÕES:")
+        formatted_list.append("1. Copie esta lista usando o botão 'Copiar Lista'")
+        formatted_list.append("2. Verifique as alas e celas no sistema Canaimé")
+        formatted_list.append("3. Atualize a configuração das unidades se necessário")
+        formatted_list.append("4. Execute o programa novamente")
+
+        list_text.insert(tk.END, "\n".join(formatted_list))
+        list_text.config(state='disabled')
+
+        # Botão para copiar lista
+        def copy_list():
+            validation_window.clipboard_clear()
+            validation_window.clipboard_append("\n".join(formatted_list))
+            messagebox.showinfo("Copiado", "Lista de presos copiada para a área de transferência!", parent=validation_window)
+
+        copy_button = tk.Button(
+            validation_window,
+            text="📋 Copiar Lista",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#3498db',
+            fg='white',
+            relief='flat',
+            cursor='hand2',
+            command=copy_list,
+            activebackground='#287bb8'
+        )
+        copy_button.pack(pady=10)
+
+        # Botão para fechar
+        close_button = tk.Button(
+            validation_window,
+            text="❌ Fechar",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#e74c3c',
+            fg='white',
+            relief='flat',
+            cursor='hand2',
+            command=validation_window.destroy,
+            activebackground='#c0392b'
+        )
+        close_button.pack(pady=5)
+
+        # Adicionar mensagem no status
+        self.add_status_message(f"ERRO: {len(unmapped_prisoners)} presos não mapeados encontrados. Verifique a janela de erro.")
+
+        logger.info("Exibindo janela de erro de validação (grab_set + wait_window)")
+        validation_window.grab_set()
+        validation_window.wait_window()
+        logger.info("Janela de erro de validação foi fechada")
