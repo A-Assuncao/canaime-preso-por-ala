@@ -48,7 +48,8 @@ def process_task(headless, queue, stop_event, login, password):
         # Validar presos não mapeados antes de continuar
         if unit_processor.unmapped_count > 0:
             logger.info(f"Enviando erro de validação: {unit_processor.unmapped_count} presos não mapeados")
-            queue.put(("validation_error", "Presos não mapeados encontrados", unit_processor.unmapped_prisoners))
+            # Enviar também a lista já mapeada para permitir continuar sem os não mapeados
+            queue.put(("validation_error", "Presos não mapeados encontrados", unit_processor.unmapped_prisoners, unit_list_processed))
             # Aguardar um pouco para garantir que a mensagem seja processada
             import time
             time.sleep(0.5)

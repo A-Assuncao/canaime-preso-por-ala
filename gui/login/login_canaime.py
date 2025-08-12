@@ -1,6 +1,6 @@
 import tkinter as tk
 import tkinter.font as tkFont
-from tkinter import messagebox, ttk
+from tkinter import messagebox, ttk, filedialog
 import itertools
 import time
 import logging
@@ -327,7 +327,8 @@ class LoginApp:
                     if hasattr(self, '_finalization_countdown'):
                         delattr(self, '_finalization_countdown')
                     # Exibir janela de erro de validação ANTES de marcar como finalizado
-                    self.show_validation_error(message_content[0], message_content[1])
+                    mapped_data = message_content[2] if len(message_content) > 2 else None
+                    self.show_validation_error(message_content[0], message_content[1], mapped_data)
                     # Marcar como finalizado APÓS exibir a janela
                     self.process_finalized = True
                     # Definir stop_event APÓS processar a mensagem (similar ao erro de login)
@@ -536,7 +537,7 @@ class LoginApp:
         self.status_text.see(tk.END)
         self.status_text.config(state='disabled')
 
-    def show_validation_error(self, title, unmapped_prisoners):
+    def show_validation_error(self, title, unmapped_prisoners, mapped_unit_data=None):
         """Exibe erro de validação com lista de presos não mapeados"""
         # Verificar se já existe uma janela de erro aberta
         if hasattr(self, '_validation_error_window') and self._validation_error_window is not None and self._validation_error_window.winfo_exists():
@@ -659,6 +660,105 @@ class LoginApp:
             activebackground='#287bb8'
         )
         copy_button.pack(pady=10)
+
+        # Ação para continuar processamento ignorando não mapeados
+        def continue_with_mapped_data():
+            try:
+                # Alerta informando que os nomes não serão contabilizados
+                messagebox.showinfo(
+                    "Continuar processamento",
+                    "Os nomes listados como não mapeados NÃO serão contabilizados na planilha final.\n\nAo clicar em OK, a planilha será gerada sem eles.",
+                    parent=validation_window
+                )
+
+                # Fechar imediatamente a janela de validação após o OK do alerta
+                try:
+                    validation_window.destroy()
+                except Exception:
+                    pass
+                finally:
+                    self._validation_error_window = None
+
+                from openpyxl import Workbook
+                from datetime import datetime
+                import pandas as pd
+                from services.report_service import calculate_data, fill_control_sheet, fill_sei_sheet
+                from config.excel_config_control import generate_unit_control_sheet, calculate_shift
+                from config.excel_config_sei import generate_unit_sei_sheet
+                from utils.pamc_folder_manager import copy_file_to_pamc
+
+                selected_unit = "PAMC"
+
+                # Validar dados mapeados
+                if not mapped_unit_data or not mapped_unit_data.get(selected_unit):
+                    messagebox.showerror("Dados indisponíveis", "Não há dados mapeados para continuar.", parent=self.root)
+                    return
+
+                # Criar workbook e remover aba padrão
+                workbook = Workbook()
+                default_sheet = workbook.active
+                workbook.remove(default_sheet)
+
+                # Gerar aba Controle
+                control_ws = generate_unit_control_sheet(workbook, selected_unit)
+                df = pd.DataFrame(mapped_unit_data[selected_unit])
+                calculated_data = calculate_data(df)
+                fill_control_sheet(control_ws, calculated_data)
+
+                # Gerar aba SEI com base na aba Controle
+                sei_ws = generate_unit_sei_sheet(workbook, selected_unit)
+                fill_sei_sheet(sei_ws, control_ws)
+
+                # Salvar arquivo Excel (diálogo)
+                current_date = datetime.now()
+                shift_name = calculate_shift(current_date)
+                formatted_date = current_date.strftime("%d%m%Y_%H%M")
+                filename = f"{shift_name} {formatted_date}.xlsx"
+
+                output_path = filedialog.asksaveasfilename(
+                    parent=self.root,
+                    title="Salvar planilha como",
+                    defaultextension=".xlsx",
+                    filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                    initialfile=filename
+                )
+
+                if not output_path:
+                    messagebox.showwarning("Operação cancelada", "Salvamento cancelado pelo usuário.", parent=self.root)
+                    return
+
+                if not output_path.lower().endswith('.xlsx'):
+                    output_path += '.xlsx'
+
+                workbook.save(output_path)
+
+                try:
+                    pamc_copy_path = copy_file_to_pamc(output_path)
+                    self.add_status_message(f"Cópia salva em: {pamc_copy_path}")
+                except Exception as e:
+                    self.add_status_message(f"AVISO: Não foi possível salvar cópia na pasta PAMC: {e}")
+
+                self.add_status_message("Processamento concluído com sucesso!")
+
+                # Encerrar app
+                self.root.after(300, self.encerrar_aplicativo)
+            except Exception as e:
+                logger.error(f"Erro ao continuar processamento: {e}", exc_info=True)
+                messagebox.showerror("Erro", f"Erro ao continuar processamento: {e}", parent=self.root)
+
+        # Botão Continuar
+        continue_button = tk.Button(
+            validation_window,
+            text="✅ Continuar",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#27ae60',
+            fg='white',
+            relief='flat',
+            cursor='hand2',
+            command=continue_with_mapped_data,
+            activebackground='#1e8449'
+        )
+        continue_button.pack(pady=5)
 
         # Botão para fechar
         close_button = tk.Button(

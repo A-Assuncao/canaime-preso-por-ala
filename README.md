@@ -8,6 +8,7 @@ Sistema automatizado para geração de planilhas PAMC do sistema Canaimé.
 - **Coleta de dados** da PAMC com processamento otimizado
 - **Geração de planilhas Excel** com abas Controle e SEI automatizadas
 - **Sistema de validação** que detecta presos não mapeados antes do processamento
+- **Opção de continuação**: permite prosseguir ignorando presos não mapeados (com alerta e fechamento automático do aviso)
 - **Interface gráfica moderna** com janelas de erro informativas e amigáveis
 - **Sistema de atualizações automáticas** para manter o programa sempre atualizado
 - **Logs detalhados** com separação visual e informações de sessão completas
@@ -73,6 +74,7 @@ Quando presos são encontrados em alas/celas que não estão configuradas no sis
    - Lista completa de presos não mapeados
    - Código, nome, ala e cela de cada preso
    - Botão para copiar a lista completa
+   - Botão "Continuar" para prosseguir sem contabilizar os não mapeados (após confirmação)
    - Instruções para correção
 
 ### Exemplo de Janela de Erro
@@ -106,6 +108,14 @@ INSTRUÇÕES:
 - **Logs Detalhados**: Registro completo no `app_log.log`
 - **Interface Amigável**: Janela de erro informativa e fácil de usar
 - **Funcionamento Garantido**: Sistema corrigido para sempre exibir a janela de erro ao usuário
+
+### Prosseguir ignorando não mapeados
+
+Se preferir finalizar a planilha mesmo com inconsistências de ala/cela:
+
+- Clique em "✅ Continuar" na janela de validação.
+- Confirme o alerta de que os nomes listados NÃO serão contabilizados.
+- A janela de validação se fechará automaticamente e o programa seguirá para salvar a planilha normalmente.
 
 ### Correções Recentes (v1.0.2)
 
@@ -164,7 +174,10 @@ UPDATE_URL=https://github.com/A-Assuncao/canaime-preso-por-ala/releases/latest/d
 1. Execute o programa
 2. Digite suas credenciais na interface de login
 3. Aguarde o processamento automático
-4. Escolha onde salvar a planilha gerada
+4. Se houver presos não mapeados, você poderá:
+   - Copiar a lista para correção posterior; ou
+   - Clicar em "✅ Continuar" para gerar a planilha ignorando esses nomes. Um alerta será exibido informando que eles NÃO serão contabilizados e, após o OK, a janela de validação será fechada automaticamente.
+5. Escolha onde salvar a planilha gerada
 
 ## Estrutura do Projeto
 

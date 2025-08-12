@@ -5,6 +5,20 @@ Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [v1.0.3] - 2025-08-12
+
+### Adicionado
+- Botão "✅ Continuar" na janela de validação para prosseguir a geração da planilha ignorando os presos não mapeados.
+- Alerta informativo antes de continuar, explicando que os nomes listados NÃO serão contabilizados na planilha final.
+
+### Alterado
+- A janela de validação é fechada automaticamente após o usuário confirmar o alerta ao optar por continuar.
+- A interface passa a receber os dados já mapeados junto com a mensagem de validação para permitir a continuação local sem reiniciar o processo.
+
+### Arquivos Modificados
+- `main.py` – Envio da mensagem de validação incluindo os dados mapeados para a UI.
+- `gui/login/login_canaime.py` – Adição do botão "✅ Continuar", fluxo de alerta/continuação e fechamento automático do popup.
+
 ## [v1.0.2] - 2025-01-12
 
 ### Corrigido
