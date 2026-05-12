@@ -5,22 +5,40 @@ import platform
 import socket
 import psutil
 import os
+import sys
+from datetime import datetime
+
+# Adicionar o diretório do projeto ao path para importações
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from utils.pamc_folder_manager import get_pamc_log_path
 
 class Logger:
     _initialized = False
     _logger = None
-    WEBHOOK_URL = ("https://discord.com/api/webhooks/1320799823707766814/"
-                   "FIaVMJ3FoRIn3VcFa1cwCfB0mMnylomZCEFX1NcxdWERwmyQCQ6UxuypzIKgDTpXZaoe")
+    _session_started = False
+    WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 
     @staticmethod
     def get_logger(log_file_path=None, level=logging.INFO):
         if not Logger._initialized:
             Logger._logger = logging.getLogger("CanaimeApp")
             Logger._logger.setLevel(level)
+            
+            # Limpar handlers existentes para evitar duplicação
+            Logger._logger.handlers.clear()
 
             # Configurar o manipulador de arquivo
             if log_file_path is None:
-                log_file_path = os.path.join(os.getcwd(), 'app_log.log')
+                try:
+                    # Usar a pasta PAMC como padrão
+                    log_file_path = str(get_pamc_log_path())
+                except Exception as e:
+                    # Fallback para pasta atual se houver problema
+                    log_file_path = os.path.join(os.getcwd(), 'app_log.log')
+                    print(f"Aviso: Não foi possível usar pasta PAMC para logs, usando pasta atual: {e}")
 
             handler = logging.FileHandler(log_file_path, encoding='utf-8')
             handler.setLevel(level)
@@ -29,7 +47,35 @@ class Logger:
             Logger._logger.addHandler(handler)
 
             Logger._initialized = True
+            
         return Logger._logger
+
+    @staticmethod
+    def start_session():
+        """Registra o início de uma nova sessão do programa"""
+        if not Logger._session_started:
+            logger = Logger.get_logger()
+            current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S,%f")[:-3]
+            separator = "=" * 80
+            
+            logger.info(separator)
+            logger.info(f"INICIANDO PROGRAMA - {current_time}")
+            logger.info(f"Versão: {Logger._get_app_version()}")
+            logger.info(f"Sistema: {platform.system()} {platform.release()}")
+            logger.info(f"Usuário: {os.getlogin()}")
+            
+            Logger._session_started = True
+
+    @staticmethod
+    def end_session():
+        """Registra o fim da sessão do programa"""
+        if Logger._session_started:  # Só finalizar se a sessão foi iniciada
+            logger = Logger.get_logger()
+            current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S,%f")[:-3]
+            
+            logger.info(f"FINALIZANDO PROGRAMA - {current_time}")
+            
+            Logger._session_started = False
 
     @staticmethod
     def capture_error(error: Exception):
@@ -80,6 +126,33 @@ class Logger:
             return "\n".join([f"{key}: {value}" for key, value in system_info.items()])
         except Exception as e:
             return f"Erro ao coletar informações do sistema: {e}"
+
+    @staticmethod
+    def section_separator(title):
+        """Cria um separador visual para seções importantes"""
+        logger = Logger.get_logger()
+        separator = "-" * 60
+        logger.info(separator)
+        logger.info(f"=== {title.upper()} ===")
+        logger.info(separator)
+
+    @staticmethod
+    def reset_logger():
+        """Reseta o logger para permitir nova inicialização (útil para testes)"""
+        Logger._initialized = False
+        Logger._session_started = False
+        if Logger._logger:
+            Logger._logger.handlers.clear()
+            Logger._logger = None
+
+    @staticmethod
+    def _get_app_version():
+        """Obtém a versão do aplicativo"""
+        try:
+            from config.config import APP_VERSION
+            return APP_VERSION
+        except ImportError:
+            return "v1.0.0"
 
 if __name__ == "__main__":
     try:

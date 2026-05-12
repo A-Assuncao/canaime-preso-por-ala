@@ -8,7 +8,7 @@ import sys
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
-from units_config import UNITS_CONFIG
+from config.units_config import UNITS_CONFIG
 
 
 def load_units_config():

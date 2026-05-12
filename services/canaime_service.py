@@ -9,7 +9,7 @@ import urllib3
 
 # Configurar paths do projeto
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
-from logger import Logger
+from utils.logger import Logger
 
 logger = Logger.get_logger()
 
@@ -41,11 +41,14 @@ class CanaimeLogin:
             tuple: (session, None) - Mantém a mesma interface do código anterior
         """
         try:
-            url = 'https://canaime.com.br/sgp2rr/login/login_principal.php'
-            logger.info(f"Tentando acessar {url} (verificação SSL desabilitada)")
+            base_url = os.getenv("CANAIME_BASE_URL", "https://canaime.com.br")
+            login_url = f"{base_url}/sgp2rr/login/login_principal.php"
+            logger.info(f"Tentando acessar {login_url} (verificação SSL desabilitada)")
+            
+            logger.info("Iniciando o login...")
             
             # Primeiro, obtém os cookies iniciais
-            response = self.session.get(url, verify=False)
+            response = self.session.get(login_url, verify=False)
             response.raise_for_status()
             logger.info(f"Obteve resposta inicial com status: {response.status_code}")
             
@@ -57,17 +60,30 @@ class CanaimeLogin:
             
             # Realiza o login
             logger.info(f"Realizando login com usuário: {self.login}")
-            login_response = self.session.post(url, data=login_data, allow_redirects=True, verify=False)
+            login_response = self.session.post(login_url, data=login_data, allow_redirects=True, verify=False)
             login_response.raise_for_status()
             logger.info(f"Resposta do login: status={login_response.status_code}, url={login_response.url}")
             
             # Verifica se o login foi bem-sucedido
-            # Vamos verificar se ainda estamos na página de login ou se há mensagem de erro
-            if "login_principal.php" in login_response.url and "Usuário ou senha inválidos" in login_response.text:
-                logger.error("Falha no login. Verificação de credenciais falhou.")
+            # Login bem-sucedido deve redirecionar para index_areas.php
+            # Login mal-sucedido permanece em login_principal.php ou redireciona para index.php
+            success_url = f"{base_url}/sgp2rr/areas/index_areas.php"
+            if "login_principal.php" in login_response.url:
+                logger.error("Falha no login: ainda na página de login")
+                raise Exception("Falha no login. Verifique suas credenciais.")
+            elif "index.php" in login_response.url and "areas" not in login_response.url:
+                logger.error("Falha no login: redirecionado para página incorreta")
+                raise Exception("Falha no login. Verifique suas credenciais.")
+            elif success_url not in login_response.url:
+                logger.error(f"Falha no login: URL inesperada - {login_response.url}")
                 raise Exception("Falha no login. Verifique suas credenciais.")
             
-            # Se chegamos aqui, assumimos que o login foi bem-sucedido
+            # Verifica também o conteúdo da página para confirmar o login
+            if "Usuário ou senha inválidos" in login_response.text or "login_principal.php" in login_response.text:
+                logger.error("Falha no login: mensagem de erro encontrada no conteúdo")
+                raise Exception("Falha no login. Verifique suas credenciais.")
+            
+            # Se chegamos aqui, o login foi bem-sucedido
             self._logged_in = True
             logger.info("Login realizado com sucesso")
             

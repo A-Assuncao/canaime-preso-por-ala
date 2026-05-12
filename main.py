@@ -11,6 +11,13 @@ from queue import Empty
 import itertools
 from openpyxl import Workbook
 from datetime import datetime
+from config.config import APP_VERSION
+from config.run_modes import (
+    DEFAULT_RUN_MODE,
+    RUN_MODE_CHAMADA,
+    RUN_MODE_CONTAGEM,
+    RUN_MODE_PLANILHA,
+)
 
 # Configurar o diretório raiz do projeto
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -22,26 +29,229 @@ from services.canaime_service import CanaimeLogin
 from data.data_processor import UnitProcessor
 from utils.updater import check_and_update
 from utils.logger import Logger
-from config.config import APP_VERSION
+from utils.pamc_folder_manager import ensure_pamc_folder, copy_file_to_pamc
 from config.excel_config_sei import generate_unit_sei_sheet
 from config.excel_config_control import generate_unit_control_sheet, calculate_shift
 
 # Configurar o logger para não mostrar dados sensíveis
 logger = Logger.get_logger()
 
-def process_task(headless, queue, stop_event, login, password):
+def process_task(headless, queue, stop_event, login, password, run_mode, chamada_selected_alas=None):
     """Função para ser executada no processo separado, executa as tarefas necessárias usando requests."""
     try:
+        allowed_modes = {RUN_MODE_PLANILHA, RUN_MODE_CHAMADA, RUN_MODE_CONTAGEM}
+        if run_mode not in allowed_modes:
+            run_mode = DEFAULT_RUN_MODE
+
         queue.put(("log", "Iniciando o login..."))
         canaime_login_service = CanaimeLogin(headless=headless, login=login, password=password)
         session, _ = canaime_login_service.perform_login()
         queue.put(("log", "Login foi bem sucedido"))
+
+        if run_mode == RUN_MODE_CHAMADA:
+            from services.chamada_pdf import build_chamada_pdf
+
+            alist = chamada_selected_alas or []
+            if not alist:
+                queue.put(("error", "Nenhuma ala selecionada para a chamada.", ""))
+                return
+
+            selected_set = {(str(t[0]), str(t[1])) for t in alist if isinstance(t, (list, tuple)) and len(t) == 2}
+            if not selected_set:
+                queue.put(("error", "Seleção de alas inválida.", ""))
+                return
+
+            queue.put(("log", f"Modo Chamada: {len(selected_set)} ala(s) selecionada(s)."))
+            preview_parts = [f"{b}/{a}" for b, a in sorted(selected_set)[:15]]
+            preview = ", ".join(preview_parts)
+            if len(selected_set) > 15:
+                preview += ", …"
+            queue.put(("log", f"Alas: {preview}"))
+
+            selected_unit = "PAMC"
+            queue.put(("log", "Carregando lista geral de presos..."))
+            unit_processor = UnitProcessor(session)
+            unit_list_processed = unit_processor.create_unit_list(selected_unit)
+
+            if unit_processor.unmapped_count > 0:
+                queue.put(
+                    (
+                        "log",
+                        f"Aviso: {unit_processor.unmapped_count} preso(s) não mapeado(s) — não entram na chamada.",
+                    )
+                )
+
+            rows = unit_list_processed.get(selected_unit, [])
+            current_date = datetime.now()
+            shift_name = calculate_shift(current_date)
+            formatted_date = current_date.strftime("%d%m%Y_%H%M")
+            filename = f"Chamada {shift_name} {formatted_date}.pdf"
+
+            temp_root = tk.Tk()
+            temp_root.withdraw()
+            temp_root.attributes("-topmost", True)
+            temp_root.lift()
+            temp_root.focus_force()
+
+            try:
+                output_path = filedialog.asksaveasfilename(
+                    parent=temp_root,
+                    title="Salvar chamada como",
+                    defaultextension=".pdf",
+                    filetypes=[("PDF", "*.pdf"), ("Todos os arquivos", "*.*")],
+                    initialfile=filename,
+                )
+            finally:
+                temp_root.destroy()
+
+            if not output_path:
+                queue.put(("error", "Salvamento cancelado pelo usuário", ""))
+                return
+
+            if not output_path.lower().endswith(".pdf"):
+                output_path += ".pdf"
+
+            try:
+                n_wings = build_chamada_pdf(
+                    output_path,
+                    rows,
+                    selected_set,
+                    unit_label=selected_unit,
+                    generated_at=current_date,
+                )
+            except ValueError as e:
+                queue.put(("error", str(e), ""))
+                return
+
+            if not os.path.exists(output_path):
+                queue.put(("error", "Arquivo PDF não foi criado.", ""))
+                return
+
+            file_size = os.path.getsize(output_path)
+            queue.put(("log", f"PDF salvo: {os.path.basename(output_path)} ({file_size} bytes), {n_wings} ala(s) com presos."))
+
+            try:
+                pamc_copy_path = copy_file_to_pamc(output_path)
+                queue.put(("log", f"Cópia salva em: {pamc_copy_path}"))
+            except Exception as e:
+                queue.put(("log", f"AVISO: Não foi possível salvar cópia na pasta PAMC: {e}"))
+
+            queue.put(("success", "Chamada gerada com sucesso!"))
+            queue.put(("exit_app", "Execução concluída. Encerrando aplicação…"))
+            stop_event.set()
+            return
+
+        if run_mode == RUN_MODE_CONTAGEM:
+            from services.contagem_pdf import build_contagem_pdf
+
+            alist = chamada_selected_alas or []
+            if not alist:
+                queue.put(("error", "Nenhuma ala selecionada para a contagem.", ""))
+                return
+
+            selected_set = {(str(t[0]), str(t[1])) for t in alist if isinstance(t, (list, tuple)) and len(t) == 2}
+            if not selected_set:
+                queue.put(("error", "Seleção de alas inválida.", ""))
+                return
+
+            queue.put(("log", f"Modo Contagem: {len(selected_set)} ala(s) selecionada(s)."))
+            preview_parts = [f"{b}/{a}" for b, a in sorted(selected_set)[:15]]
+            preview = ", ".join(preview_parts)
+            if len(selected_set) > 15:
+                preview += ", …"
+            queue.put(("log", f"Alas: {preview}"))
+
+            selected_unit = "PAMC"
+            queue.put(("log", "Carregando lista geral de presos..."))
+            unit_processor = UnitProcessor(session)
+            unit_list_processed = unit_processor.create_unit_list(selected_unit)
+
+            if unit_processor.unmapped_count > 0:
+                queue.put(
+                    (
+                        "log",
+                        f"Aviso: {unit_processor.unmapped_count} preso(s) não mapeado(s) — não entram na agregação por cela.",
+                    )
+                )
+
+            rows = unit_list_processed.get(selected_unit, [])
+            current_date = datetime.now()
+            shift_name = calculate_shift(current_date)
+            formatted_date = current_date.strftime("%d%m%Y_%H%M")
+            filename = f"Contagem {shift_name} {formatted_date}.pdf"
+
+            temp_root = tk.Tk()
+            temp_root.withdraw()
+            temp_root.attributes("-topmost", True)
+            temp_root.lift()
+            temp_root.focus_force()
+
+            try:
+                output_path = filedialog.asksaveasfilename(
+                    parent=temp_root,
+                    title="Salvar contagem como",
+                    defaultextension=".pdf",
+                    filetypes=[("PDF", "*.pdf"), ("Todos os arquivos", "*.*")],
+                    initialfile=filename,
+                )
+            finally:
+                temp_root.destroy()
+
+            if not output_path:
+                queue.put(("error", "Salvamento cancelado pelo usuário", ""))
+                return
+
+            if not output_path.lower().endswith(".pdf"):
+                output_path += ".pdf"
+
+            try:
+                n_blocks = build_contagem_pdf(
+                    output_path,
+                    rows,
+                    selected_set,
+                    unit_label=selected_unit,
+                    generated_at=current_date,
+                )
+            except ValueError as e:
+                queue.put(("error", str(e), ""))
+                return
+
+            if not os.path.exists(output_path):
+                queue.put(("error", "Arquivo PDF não foi criado.", ""))
+                return
+
+            file_size = os.path.getsize(output_path)
+            queue.put(
+                ("log", f"PDF salvo: {os.path.basename(output_path)} ({file_size} bytes), {n_blocks} bloco(s) de ala.")
+            )
+
+            try:
+                pamc_copy_path = copy_file_to_pamc(output_path)
+                queue.put(("log", f"Cópia salva em: {pamc_copy_path}"))
+            except Exception as e:
+                queue.put(("log", f"AVISO: Não foi possível salvar cópia na pasta PAMC: {e}"))
+
+            queue.put(("success", "Contagem gerada com sucesso!"))
+            queue.put(("exit_app", "Execução concluída. Encerrando aplicação…"))
+            stop_event.set()
+            return
 
         selected_unit = "PAMC"
         queue.put(("log", "Iniciando a lista da PAMC..."))
 
         unit_processor = UnitProcessor(session)
         unit_list_processed = unit_processor.create_unit_list(selected_unit)
+        
+        # Validar presos não mapeados antes de continuar
+        if unit_processor.unmapped_count > 0:
+            logger.info(f"Enviando erro de validação: {unit_processor.unmapped_count} presos não mapeados")
+            # Enviar também a lista já mapeada para permitir continuar sem os não mapeados
+            queue.put(("validation_error", "Presos não mapeados encontrados", unit_processor.unmapped_prisoners, unit_list_processed))
+            # Aguardar um pouco para garantir que a mensagem seja processada
+            import time
+            time.sleep(0.5)
+            # NÃO definir stop_event.set() aqui - deixar a interface processar a mensagem
+            return
         
         # Não logar a lista completa, apenas continuar o processo
         num_records = len(unit_list_processed.get(selected_unit, []))
@@ -54,7 +264,7 @@ def process_task(headless, queue, stop_event, login, password):
         workbook.remove(default_sheet)
         
         # Importar as funções necessárias do report_service
-        from report_service import calculate_data, fill_control_sheet, fill_sei_sheet
+        from services.report_service import calculate_data, fill_control_sheet, fill_sei_sheet
         import pandas as pd
         
         queue.put(("log", "Preenchendo a aba Controle no excel..."))
@@ -156,6 +366,13 @@ def process_task(headless, queue, stop_event, login, password):
                 queue.put(("log", f"AVISO: Arquivo pode estar corrompido (tamanho: {file_size} bytes)"))
             
             queue.put(("log", f"Arquivo salvo como: {os.path.basename(output_path)} ({file_size} bytes)"))
+            
+            # Copiar o arquivo para a pasta PAMC
+            try:
+                pamc_copy_path = copy_file_to_pamc(output_path)
+                queue.put(("log", f"Cópia salva em: {pamc_copy_path}"))
+            except Exception as e:
+                queue.put(("log", f"AVISO: Não foi possível salvar cópia na pasta PAMC: {e}"))
         except Exception as e:
             logger.error(f"Erro ao salvar arquivo Excel: {e}", exc_info=True)
             queue.put(("error", f"Erro ao salvar arquivo Excel: {e}", traceback.format_exc()))
@@ -164,20 +381,41 @@ def process_task(headless, queue, stop_event, login, password):
         queue.put(("success", "Processamento concluído com sucesso!"))
         
         # Sinal para encerrar completamente a aplicação
-        queue.put(("exit_app", "Encerrando aplicação..."))
+        queue.put(("exit_app", "Execução concluída. Encerrando aplicação…"))
         stop_event.set()
 
     except Exception as e:
         error_message = f"Erro durante o processo: {e}"
-        logger.error(error_message, exc_info=True)
+        # Enviar erro imediatamente (sem logar o traceback aqui)
         queue.put(("error", str(e), traceback.format_exc()))
+        # Aguardar um pouco para garantir que a mensagem seja processada
+        import time
+        time.sleep(0.1)
+        # Não continuar com o finally até que o erro seja processado
+        return
     finally:
         queue.put(("log", "Finalizando processo..."))
         stop_event.set()
 
 def main(headless=True):
     """Função principal para executar a aplicação."""
+    # Garantir que a pasta PAMC existe ANTES de inicializar o logger
+    try:
+        pamc_folder = ensure_pamc_folder()
+        print(f"Pasta PAMC criada/verificada com sucesso: {pamc_folder}")
+    except Exception as e:
+        print(f"Erro ao criar pasta PAMC: {e}")
+    
+    # Iniciar a sessão do logger (que agora usará a pasta PAMC)
+    Logger.start_session()
+    logger = Logger.get_logger()
     logger.info("Iniciando a aplicação Canaimé...")
+    
+    # Log da verificação da pasta PAMC
+    try:
+        logger.info(f"Pasta PAMC verificada: {pamc_folder}")
+    except:
+        logger.info("Pasta PAMC criada com sucesso")
 
     parser = argparse.ArgumentParser(description="Canaimé Application")
     parser.add_argument("--skip-update", action="store_true", help="Skip the update check on startup")
@@ -201,6 +439,8 @@ def main(headless=True):
         logger.critical(error_message, exc_info=True)
         show_error_popup(error_message, traceback.format_exc())
     finally:
+        # Finalizar a sessão do logger antes de encerrar
+        Logger.end_session()
         # Garantir que o programa seja encerrado completamente
         sys.exit(0)
 
