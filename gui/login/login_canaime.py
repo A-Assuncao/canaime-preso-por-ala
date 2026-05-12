@@ -4,6 +4,7 @@ from tkinter import messagebox, ttk, filedialog
 import itertools
 import time
 import logging
+from datetime import datetime
 import threading
 import sys
 import os
@@ -25,11 +26,25 @@ try:
     from utils.paths import setup_project_paths
     setup_project_paths()
     from config.config import APP_VERSION
+    from config.run_modes import (
+        DEFAULT_RUN_MODE,
+        RUN_MODE_CHAMADA,
+        RUN_MODE_CONTAGEM,
+        RUN_MODE_PLANILHA,
+    )
     from utils.logger import Logger
+    from gui.login.chamada_ala_dialog import prompt_chamada_alas
 except ImportError as e:
     # Fallback para definições básicas
     from config.config import APP_VERSION
+    from config.run_modes import (
+        DEFAULT_RUN_MODE,
+        RUN_MODE_CHAMADA,
+        RUN_MODE_CONTAGEM,
+        RUN_MODE_PLANILHA,
+    )
     from utils.logger import Logger
+    from gui.login.chamada_ala_dialog import prompt_chamada_alas
 
 # URL de login do sistema Canaimé (não mais usada diretamente aqui)
 # URL_LOGIN_CANAIME = 'https://canaime.com.br/sgp2rr/login/login_principal.php'
@@ -45,6 +60,8 @@ class LogHandler(logging.Handler):
         self.text_widget.tag_config('error', foreground='#ff4500') # Red-orange
         self.text_widget.tag_config('critical', foreground='#dc143c') # Crimson
         self.text_widget.tag_config('debug', foreground='#90ee90') # Light green
+        # Conclusão de execução (mesmo widget que os logs da tela inicial)
+        self.text_widget.tag_config('success', foreground='#6eeb83', font=('Consolas', 9, 'bold'))
 
     def emit(self, record):
         try:
@@ -73,7 +90,7 @@ class LoginApp:
         self._validation_error_window = None  # Referência para janela de erro de validação
 
         self.root.title(f"Planilha PAMC {APP_VERSION}")
-        self.root.geometry("400x600")
+        self.root.geometry("400x720")
         self.root.resizable(False, False)
         self.root.configure(bg="#1E2C44")  # Cor de fundo azul escuro
 
@@ -161,10 +178,44 @@ class LoginApp:
             highlightthickness=1,
             bd=0 # Remove border
         )
-        self.password_entry.pack(pady=(0, 40), fill="x", padx=15)
+        self.password_entry.pack(pady=(0, 16), fill="x", padx=15)
         self.set_placeholder(self.password_entry, " Senha")
         self.password_entry.bind("<FocusIn>", lambda e: self.on_entry_focus_in(self.password_entry, " Senha", is_password=True))
         self.password_entry.bind("<FocusOut>", lambda e: self.on_entry_focus_out(self.password_entry, " Senha", is_password=True))
+
+        self.run_mode_var = tk.StringVar(value=DEFAULT_RUN_MODE)
+        self.mode_frame = tk.LabelFrame(
+            main_frame,
+            text=" O que deseja imprimir? ",
+            font=('Segoe UI', 9, 'bold'),
+            fg="#FFFFFF",
+            bg="#1E2C44",
+            highlightbackground="#2B3C57",
+            highlightthickness=1,
+            bd=0,
+        )
+        self.mode_frame.pack(fill="x", padx=15, pady=(0, 16))
+
+        mode_options = [
+            ("Planilha", RUN_MODE_PLANILHA),
+            ("Chamada", RUN_MODE_CHAMADA),
+            ("Contagem", RUN_MODE_CONTAGEM),
+        ]
+        for text, value in mode_options:
+            rb = tk.Radiobutton(
+                self.mode_frame,
+                text=text,
+                variable=self.run_mode_var,
+                value=value,
+                font=('Segoe UI', 10),
+                bg="#1E2C44",
+                fg="#FFFFFF",
+                selectcolor="#2B3C57",
+                activebackground="#1E2C44",
+                activeforeground="#FFFFFF",
+                anchor="w",
+            )
+            rb.pack(fill="x", padx=10, pady=3)
 
         # Login Button
         self.login_button = tk.Button(
@@ -179,7 +230,7 @@ class LoginApp:
             activebackground="#155CBF",
             pady=10
         )
-        self.login_button.pack(pady=(0, 20), fill="x")
+        self.login_button.pack(pady=(0, 12), fill="x")
         
         # Status Frame para mostrar logs e status
         status_frame = tk.Frame(main_frame, bg="#2B3C57", bd=1, relief="solid")
@@ -218,6 +269,16 @@ class LoginApp:
     def bind_events(self):
         self.root.bind('<Return>', lambda event: self.iniciar_login()) # Bind Enter key to login
 
+    def _set_run_mode_widgets_state(self, state):
+        """Habilita ou desabilita os radio buttons do modo de execução."""
+        if not hasattr(self, "mode_frame"):
+            return
+        for child in self.mode_frame.winfo_children():
+            try:
+                child.config(state=state)
+            except tk.TclError:
+                pass
+
     def set_placeholder(self, entry, placeholder_text):
         entry.insert(0, placeholder_text)
         entry.config(fg='gray')
@@ -248,6 +309,9 @@ class LoginApp:
         self._validation_error_window = None
         # CRÍTICO: Resetar o process_stop_event para novo processo
         self.process_stop_event.clear()
+        # Garantir handler de log (removido após sucesso/erro em finalizar_processo; modos sem exit_app precisam dele)
+        if hasattr(self, "log_handler") and self.log_handler not in logger.handlers:
+            logger.addHandler(self.log_handler)
             
         username = self.username_entry.get()
         password = self.password_entry.get()
@@ -262,6 +326,17 @@ class LoginApp:
             self.add_status_message("ERRO: Por favor, insira o usuário e a senha.")
             return
 
+        run_mode = self.run_mode_var.get()
+        chamada_selected_alas = None
+        if run_mode == RUN_MODE_CHAMADA:
+            chamada_selected_alas = prompt_chamada_alas(self.root)
+            if chamada_selected_alas is None:
+                return
+        elif run_mode == RUN_MODE_CONTAGEM:
+            chamada_selected_alas = prompt_chamada_alas(self.root)
+            if chamada_selected_alas is None:
+                return
+
         # Limpar o status text e mostrar mensagem de início
         self.status_text.config(state='normal')
         self.status_text.delete(1.0, tk.END)
@@ -269,6 +344,7 @@ class LoginApp:
         self.add_status_message("Iniciando processo de login...")
 
         self.login_button.config(state=tk.DISABLED)
+        self._set_run_mode_widgets_state(tk.DISABLED)
         self.animation_running = True
 
         logger.info("Iniciando processo de login...")
@@ -276,7 +352,17 @@ class LoginApp:
         try:
             # Iniciar o processo em segundo plano
             p = Process(target=self.process_task_func,
-                        args=(self.headless, self.process_queue, self.process_stop_event, username, password))
+                        args=(
+                            self.headless,
+                            self.process_queue,
+                            self.process_stop_event,
+                            username,
+                            password,
+                            run_mode,
+                            chamada_selected_alas
+                            if run_mode in (RUN_MODE_CHAMADA, RUN_MODE_CONTAGEM)
+                            else None,
+                        ))
             p.start()
             
             self.root.after(100, self.verificar_fila)
@@ -285,6 +371,7 @@ class LoginApp:
             logger.error(error_msg, exc_info=True)
             self.add_status_message(f"ERRO: {error_msg}")
             self.login_button.config(state=tk.NORMAL)
+            self._set_run_mode_widgets_state(tk.NORMAL)
             self.animation_running = False
 
     def animar_bolinha(self):
@@ -311,7 +398,7 @@ class LoginApp:
                     self.finalizar_processo("Sucesso", message_content[0])
                 elif message_type == "exit_app":
                     # Encerrar completamente a aplicação
-                    self.add_status_message(message_content[0])
+                    self.add_status_success(message_content[0])
                     self.root.after(500, self.encerrar_aplicativo)
                 elif message_type == "error":
                     logger.info(f"Processando erro: {message_content[0]}")
@@ -370,11 +457,12 @@ class LoginApp:
             
         logger.info(f"Finalizando processo: {title} - {message}")
         self.login_button.config(state=tk.NORMAL)
+        self._set_run_mode_widgets_state(tk.NORMAL)
         self.animation_running = False
         self.process_finalized = True
 
         if title == "Sucesso":
-            self.add_status_message(f"SUCESSO: {message}")
+            self.add_status_success(message)
             # O encerramento será tratado pelo sinal exit_app
         elif title == "Erro":
             self.add_status_message(f"❌ ERRO: {message}")
@@ -537,6 +625,15 @@ class LoginApp:
         self.status_text.see(tk.END)
         self.status_text.config(state='disabled')
 
+    def add_status_success(self, message):
+        """Linha de conclusão no mesmo estilo dos logs (timestamp + nível), em verde."""
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+        line = f"{ts} - OK - ✓ {message}\n"
+        self.status_text.config(state='normal')
+        self.status_text.insert(tk.END, line, "success")
+        self.status_text.see(tk.END)
+        self.status_text.config(state='disabled')
+
     def show_validation_error(self, title, unmapped_prisoners, mapped_unit_data=None):
         """Exibe erro de validação com lista de presos não mapeados"""
         # Verificar se já existe uma janela de erro aberta
@@ -548,6 +645,7 @@ class LoginApp:
         logger.info(f"Presos não mapeados recebidos: {len(unmapped_prisoners) if unmapped_prisoners else 0}")
         
         self.login_button.config(state=tk.NORMAL)
+        self._set_run_mode_widgets_state(tk.NORMAL)
         self.animation_running = False
         
         # Log adicional para debug
@@ -738,7 +836,7 @@ class LoginApp:
                 except Exception as e:
                     self.add_status_message(f"AVISO: Não foi possível salvar cópia na pasta PAMC: {e}")
 
-                self.add_status_message("Processamento concluído com sucesso!")
+                self.add_status_success("Processamento concluído com sucesso!")
 
                 # Encerrar app
                 self.root.after(300, self.encerrar_aplicativo)

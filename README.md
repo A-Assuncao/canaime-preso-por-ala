@@ -7,12 +7,34 @@ Sistema automatizado para geração de planilhas PAMC do sistema Canaimé.
 - **Login automatizado** no sistema Canaimé com detecção robusta de erros
 - **Coleta de dados** da PAMC com processamento otimizado
 - **Geração de planilhas Excel** com abas Controle e SEI automatizadas
+- **Modo Chamada**: PDF nominal por ala (A4), com seleção de alas antes do login; cópia opcional para pasta PAMC
+- **Modo Contagem**: PDF em paisagem para conferência por cela (QTD do sistema + coluna **PREENCHER**), mesma seleção de alas da chamada; cópia opcional para pasta PAMC
+- **PDFs** gerados com ReportLab (`services/chamada_pdf.py`, `services/contagem_pdf.py`)
 - **Sistema de validação** que detecta presos não mapeados antes do processamento
 - **Opção de continuação**: permite prosseguir ignorando presos não mapeados (com alerta e fechamento automático do aviso)
 - **Interface gráfica moderna** com janelas de erro informativas e amigáveis
 - **Sistema de atualizações automáticas** para manter o programa sempre atualizado
-- **Logs detalhados** com separação visual e informações de sessão completas
+- **Logs detalhados** com separação visual e informações de sessão completas; ao concluir Chamada/Contagem (ou continuar após validação), mensagem de **sucesso em destaque verde** no painel da tela inicial
 - **Configuração segura** via arquivo `.env` para proteção de credenciais
+
+## Modos de execução (após login)
+
+Na tela inicial, escolha **uma** opção antes de **Login**:
+
+| Modo | Resultado |
+|------|-----------|
+| **Planilha** | Lista PAMC → validação de não mapeados (se houver) → Excel Controle/SEI |
+| **Chamada** | Seleção de alas (A/B) → lista → diálogo para salvar **PDF** da chamada nominal |
+| **Contagem** | Mesma seleção de alas → lista → diálogo para salvar **PDF** de contagem por cela (QTD sistema + coluna PREENCHER) |
+
+Chamada e Contagem encerram o aplicativo após sucesso (fluxo com fila `success` / `exit_app`). A planilha permanece com o fluxo anterior (incluindo janela de validação e opção de continuar).
+
+## PDFs (Chamada e Contagem)
+
+- **Chamada**: uma seção por ala com tabela (Qtd, Item, Cela, Nome, Observações); estilo otimizado para impressão.
+- **Contagem**: A4 **paisagem**, várias alas por linha (até 4), cabeçalho institucional repetido em cada página, linhas grossas entre alas para recorte; apenas alas com celas cadastradas em `config/units_config.py`; linhas de dados = quantidade de celas da ala (sem linhas vazias extras).
+
+Dependência: `reportlab` (e `pillow`, já listados em `requirements.txt`).
 
 ## Sistema de Logs
 
@@ -23,7 +45,7 @@ O sistema agora possui um sistema de logs aprimorado com separação visual clar
 ```
 ================================================================================
 INICIANDO PROGRAMA - 12/01/2025 10:30:15,123
-Versão: v1.0.0
+Versão: v1.1.0
 Sistema: Windows 10.0.19045
 Usuário: usuario123
 2025-01-12 10:30:15,124 - INFO - Iniciando a aplicação Canaimé...
@@ -117,7 +139,7 @@ Se preferir finalizar a planilha mesmo com inconsistências de ala/cela:
 - Confirme o alerta de que os nomes listados NÃO serão contabilizados.
 - A janela de validação se fechará automaticamente e o programa seguirá para salvar a planilha normalmente.
 
-### Correções Recentes (v1.0.2)
+### Correções Recentes (v1.0.2 e anteriores)
 
 O sistema de validação foi aprimorado para garantir que as janelas de erro sejam sempre exibidas:
 
@@ -171,26 +193,27 @@ UPDATE_URL=https://github.com/A-Assuncao/canaime-preso-por-ala/releases/latest/d
 
 ## Uso
 
-1. Execute o programa
-2. Digite suas credenciais na interface de login
-3. Aguarde o processamento automático
-4. Se houver presos não mapeados, você poderá:
+1. Execute o programa (`python main.py`).
+2. Escolha o **modo** (Planilha, Chamada ou Contagem).
+3. Digite usuário e senha do Canaimé e clique em **Login**.
+4. Nos modos **Chamada** e **Contagem**, selecione as alas no diálogo (todas vêm marcadas; desmarque o que não for usar) e confirme.
+5. Aguarde o processamento; nos modos PDF, escolha o caminho do arquivo ao salvar.
+6. Se houver presos não mapeados **no modo Planilha**, você poderá:
    - Copiar a lista para correção posterior; ou
    - Clicar em "✅ Continuar" para gerar a planilha ignorando esses nomes. Um alerta será exibido informando que eles NÃO serão contabilizados e, após o OK, a janela de validação será fechada automaticamente.
-5. Escolha onde salvar a planilha gerada
+7. No **modo Planilha**, ao concluir o processamento, escolha onde salvar o arquivo Excel.
 
 ## Estrutura do Projeto
 
 ```
 canaime-preso-por-ala/
-├── config/          # Configurações do sistema
-├── data/           # Processamento de dados
-├── gui/            # Interface gráfica
-├── services/       # Serviços de autenticação e relatórios
-├── utils/          # Utilitários e logger
-├── views/          # Visualizações
-├── main.py         # Arquivo principal
-└── requirements.txt # Dependências
+├── config/          # Configurações (incl. `units_config.py`, versão em `config.py`)
+├── data/            # Processamento de dados (lista PAMC)
+├── gui/             # Interface gráfica (`login_canaime.py`, diálogo de alas)
+├── services/        # Login Canaimé, PDFs (`chamada_pdf.py`, `contagem_pdf.py`)
+├── utils/           # Utilitários, logger, pasta PAMC
+├── main.py          # Ponto de entrada e `process_task` (planilha / chamada / contagem)
+└── requirements.txt
 ```
 
 ## Logs

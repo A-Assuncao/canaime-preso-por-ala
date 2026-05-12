@@ -5,6 +5,26 @@ Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [v1.1.0] - 2026-05-08
+
+### Adicionado
+- **Modo Contagem**: geração de PDF (`services/contagem_pdf.py`) para conferência numérica por cela, com QTD do sistema (lista PAMC), coluna **PREENCHER** para anotação manual e título por ala (sem linha de descrição de regime).
+- Seleção de alas **igual à Chamada** (diálogo Bloco A/B); alas sem lista de celas no `units_config` **não** geram bloco no PDF.
+- PDF de contagem em **A4 paisagem**, até **4 alas por linha**, linhas verticais mais grossas entre alas para recorte; cabeçalho institucional (penitenciária, título do documento, emitido/plantão) **repetido em todas as páginas** via callback de página.
+- Altura das linhas da mini-tabela ajustada dinamicamente (`rowHeights`) para a maior ala caber no frame do ReportLab, evitando erro de fluxo em alas com muitas celas.
+- **Feedback visual de sucesso** na tela de login: linhas em verde no painel de status (`add_status_success`), no mesmo estilo de timestamp dos logs, ao concluir Chamada, Contagem ou fluxo de continuação após validação; mensagem de encerramento atualizada no `main.py`.
+
+### Corrigido
+- **PDF Chamada** (`services/chamada_pdf.py`): células da coluna **Qtd** com `BOX` fechado (topo/fundo); `LINEABOVE`/`LINEBELOW` brancos só entre linhas de Qtd vazias; `BOX` da quantidade aplicado por último.
+- **Contagem PDF**: correção de `NameError` (`wing_tables` não inicializado); import de `TA_LEFT`; remoção de `KeepTogether` na grade externa onde gerava conflito com o layout.
+- **Contagem PDF**: erro “Flowable too large” ao aninhar tabelas altas em página seguinte — resolvido com alturas de linha fixas calculadas a partir da altura útil da página.
+
+### Alterado
+- Colunas **QTD** e **PREENCHER** com a mesma largura na mini-tabela de contagem; espaçamento vertical das linhas de dados revisado.
+
+### Arquivos principais
+- `services/contagem_pdf.py` (novo), `main.py`, `gui/login/login_canaime.py`, `services/chamada_pdf.py`, `config/config.py`.
+
 ## [v1.0.3] - 2025-08-12
 
 ### Adicionado
