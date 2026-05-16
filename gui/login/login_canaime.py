@@ -25,7 +25,7 @@ if config_path not in sys.path:
 try:
     from utils.paths import setup_project_paths
     setup_project_paths()
-    from config.config import APP_VERSION
+    from config.config import APP_TAGLINE, APP_VERSION, app_window_title
     from config.run_modes import (
         DEFAULT_RUN_MODE,
         RUN_MODE_CHAMADA,
@@ -36,7 +36,7 @@ try:
     from gui.login.chamada_ala_dialog import prompt_chamada_alas
 except ImportError as e:
     # Fallback para definições básicas
-    from config.config import APP_VERSION
+    from config.config import APP_TAGLINE, APP_VERSION, app_window_title
     from config.run_modes import (
         DEFAULT_RUN_MODE,
         RUN_MODE_CHAMADA,
@@ -89,7 +89,7 @@ class LoginApp:
         self._login_error_window = None  # Referência para janela de erro de login
         self._validation_error_window = None  # Referência para janela de erro de validação
 
-        self.root.title(f"Planilha PAMC {APP_VERSION}")
+        self.root.title(app_window_title())
         self.root.geometry("400x720")
         self.root.resizable(False, False)
         self.root.configure(bg="#1E2C44")  # Cor de fundo azul escuro
@@ -140,11 +140,12 @@ class LoginApp:
         # Subtitle
         subtitle_label = tk.Label(
             main_frame,
-            text=f"Planilha PAMC {APP_VERSION}",
+            text=f"{app_window_title()} · {APP_TAGLINE}",
             font=('Segoe UI', 9),
-            fg="#FFFFFF",
+            fg="#B8C8DC",
             bg="#1E2C44",
-            anchor="e"  # Align to right
+            wraplength=320,
+            justify="center",
         )
         subtitle_label.pack(fill="x", padx=5, pady=(0, 30))
 

@@ -11,7 +11,7 @@ from queue import Empty
 import itertools
 from openpyxl import Workbook
 from datetime import datetime
-from config.config import APP_VERSION
+from config.config import APP_DISPLAY_NAME, APP_VERSION
 from config.run_modes import (
     DEFAULT_RUN_MODE,
     RUN_MODE_CHAMADA,
@@ -29,6 +29,7 @@ from services.canaime_service import CanaimeLogin
 from data.data_processor import UnitProcessor
 from utils.updater import check_and_update
 from utils.logger import Logger
+from utils.console_interrupt import enable_ctrl_c_exit
 from utils.pamc_folder_manager import ensure_pamc_folder, copy_file_to_pamc
 from config.excel_config_sei import generate_unit_sei_sheet
 from config.excel_config_control import generate_unit_control_sheet, calculate_shift
@@ -417,20 +418,39 @@ def main(headless=True):
     except:
         logger.info("Pasta PAMC criada com sucesso")
 
-    parser = argparse.ArgumentParser(description="Canaimé Application")
+    parser = argparse.ArgumentParser(
+        description=f"{APP_DISPLAY_NAME} — planilhas e PDFs por ala (Canaimé PAMC)",
+    )
     parser.add_argument("--skip-update", action="store_true", help="Skip the update check on startup")
     args = parser.parse_args()
 
+    update_failed = False
+
     if not args.skip_update:
         try:
-            if not check_and_update(APP_VERSION):
+            update_applied = check_and_update(APP_VERSION, parent=None)
+            if update_applied:
+                logger.info("Atualização aplicada; encerrando para reinício.")
+                from utils.update_helper import shutdown_current_app
+
+                shutdown_current_app()
+            else:
                 logger.info("O status de atualização automática: Nenhuma atualização disponível")
         except Exception as e:
             logger.error(f"Erro ao verificar atualizações: {e}")
+            update_failed = True
 
     login_app = None
     try:
         login_root = tk.Tk()
+        enable_ctrl_c_exit(login_root)
+        if update_failed:
+            print(
+                "\n[Atualização] Não foi possível atualizar. "
+                "O programa seguirá com a versão instalada.\n"
+                "Para sair: feche a janela do programa ou pressione Ctrl+C.\n",
+                flush=True,
+            )
         login_app = LoginApp(login_root, headless=headless, process_task_func=process_task)
         login_root.mainloop()
 

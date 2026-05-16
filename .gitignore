@@ -164,3 +164,6 @@ cython_debug/
 Presos por Ala.xlsx
 dados_ficticios.py
 *app_log.log
+tests/
+requirements-dev.txt
+canaime-preso-por-ala-v*.exe

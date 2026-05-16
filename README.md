@@ -1,6 +1,8 @@
-# Canaimé - Planilha PAMC
+# Plantão Helper - PAMC
 
-Sistema automatizado para geração de planilhas PAMC do sistema Canaimé.
+**Plantão Helper - PAMC** é o aplicativo para a Penitenciária Agrícola do Monte Cristo (PAMC): planilhas Excel, PDF de **chamada nominal** e **contagem por cela**, integrado ao sistema **Canaimé**.
+
+> Nome técnico do pacote (repositório e instalador): `canaime-preso-por-ala`.
 
 ## Funcionalidades
 
@@ -13,7 +15,7 @@ Sistema automatizado para geração de planilhas PAMC do sistema Canaimé.
 - **Sistema de validação** que detecta presos não mapeados antes do processamento
 - **Opção de continuação**: permite prosseguir ignorando presos não mapeados (com alerta e fechamento automático do aviso)
 - **Interface gráfica moderna** com janelas de erro informativas e amigáveis
-- **Sistema de atualizações automáticas** para manter o programa sempre atualizado
+- **Atualizações automáticas** (Windows): download com barra de progresso; ao concluir, você escolhe abrir a nova versão ou continuar na atual
 - **Logs detalhados** com separação visual e informações de sessão completas; ao concluir Chamada/Contagem (ou continuar após validação), mensagem de **sucesso em destaque verde** no painel da tela inicial
 - **Configuração segura** via arquivo `.env` para proteção de credenciais
 
@@ -31,7 +33,7 @@ Chamada e Contagem encerram o aplicativo após sucesso (fluxo com fila `success`
 
 ## PDFs (Chamada e Contagem)
 
-- **Chamada**: uma seção por ala com tabela (Qtd, Item, Cela, Nome, Observações); estilo otimizado para impressão.
+- **Chamada**: uma seção por ala com tabela (Qtd, Item, Cela, Nome, Observações); estilo otimizado para impressão **frente e verso** — cada ala (a partir da 2ª) começa em **página ímpar** (frente da folha); se necessário, o PDF inclui uma página em branco entre alas.
 - **Contagem**: A4 **paisagem**, várias alas por linha (até 4), cabeçalho institucional repetido em cada página, linhas grossas entre alas para recorte; apenas alas com celas cadastradas em `config/units_config.py`; linhas de dados = quantidade de celas da ala (sem linhas vazias extras).
 
 Dependência: `reportlab` (e `pillow`, já listados em `requirements.txt`).
@@ -45,7 +47,7 @@ O sistema agora possui um sistema de logs aprimorado com separação visual clar
 ```
 ================================================================================
 INICIANDO PROGRAMA - 12/01/2025 10:30:15,123
-Versão: v1.1.0
+Versão: v1.4.0
 Sistema: Windows 10.0.19045
 Usuário: usuario123
 2025-01-12 10:30:15,124 - INFO - Iniciando a aplicação Canaimé...
@@ -182,7 +184,15 @@ UPDATE_URL=https://github.com/A-Assuncao/canaime-preso-por-ala/releases/latest/d
 - **CANAIME_PASSWORD**: Sua senha do sistema Canaimé
 - **CANAIME_BASE_URL**: URL base do sistema (padrão: https://canaime.com.br)
 - **DISCORD_WEBHOOK_URL**: Webhook do Discord para notificações de erro (opcional)
-- **UPDATE_URL**: URL para verificar atualizações automáticas
+- **UPDATE_URL**: URL para verificar atualizações automáticas (`latest_version.txt` e `canaime-preso-por-ala-v{versão}.exe` no release, ex.: `canaime-preso-por-ala-v1.1.0.exe`)
+
+### Atualizações (Windows)
+
+1. Na abertura, o app compara a versão com `latest_version.txt` no GitHub Releases.
+2. Se houver versão nova, pergunta se deseja baixar.
+3. Durante o download, uma janela mostra o progresso — **não feche** nem abra outra cópia (lock evita duplicar o download).
+4. Na tela **Download concluído**, escolha **Abrir nova versão** (fecha este app e inicia o `.exe` novo) ou **Continuar com a versão atual**.
+5. O instalador é salvo na **mesma pasta do programa** como `canaime-preso-por-ala-v{versão}.exe` (ex.: `canaime-preso-por-ala-v1.4.0.exe`). Log: `%TEMP%\canaime-update-helper.log`.
 
 ### 3. Segurança
 

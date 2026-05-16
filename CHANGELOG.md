@@ -5,6 +5,55 @@ Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [v1.4.0] - 2026-05-16
+
+### Adicionado
+- **Nome comercial do produto:** **Plantão Helper - PAMC** (`APP_DISPLAY_NAME` em `config/config.py`), com tagline e título de janela centralizados (`app_window_title()`).
+- Fluxo de atualização com tela **“Download concluído”** e escolha **Abrir nova versão** / **Continuar com a versão atual**.
+- Testes: `tests/test_updater_urls.py`, `tests/test_logger_discord.py`, `tests/test_update_helper.py`.
+
+### Alterado
+- **Atualização automática** revisada: download com progresso (%, velocidade, ETA); abertura do novo `.exe` via `subprocess.Popen` (sem depender de PowerShell); instalador salvo na pasta do programa (não em `%TEMP%`).
+- URL do instalador no GitHub: `canaime-preso-por-ala-v{versão}.exe` (com `v` no nome do arquivo).
+- Interface de login exibe **Plantão Helper - PAMC** e tagline em vez de apenas “Planilha PAMC”.
+- Versão do aplicativo: **v1.4.0**.
+
+### Corrigido
+- Erro de sintaxe na janela de progresso (`update_progress_dialog.py`).
+- Envio ao Discord apenas quando `DISCORD_WEBHOOK_URL` está configurada.
+- `Ctrl+C` no terminal com app Tkinter (`utils/console_interrupt.py`).
+- Lock de atualização liberado após falha ou cancelamento do download.
+
+### Arquivos principais
+- `config/config.py`, `gui/login/login_canaime.py`, `utils/updater.py`, `utils/update_helper.py`, `gui/update/update_progress_dialog.py`, `README.md`.
+
+## [v1.3.0] - 2026-05-16
+
+### Adicionado
+- **Atualização automática** com helper **PowerShell** (`utils/update_helper.py`): aguarda o PID do app encerrar, inicia o novo `.exe` e remove o script temporário.
+- **Janela de progresso** do download (`gui/update/update_progress_dialog.py`): porcentagem, tamanho, velocidade e tempo restante; aviso para não fechar durante o download.
+- **Lock de atualização** (`utils/update_lock.py`) para evitar downloads/instâncias duplicados em paralelo.
+
+### Alterado
+- `utils/updater.py`: download em thread com arquivo `.part`, destino na pasta do executável, `os._exit` após disparar o helper (libera processo e arquivo antigo).
+- `main.py`: verificação de update com `tk.Tk` oculto antes da tela de login.
+- Versão do aplicativo: **v1.3.0**.
+
+### Arquivos principais
+- `utils/updater.py`, `utils/update_helper.py`, `utils/update_lock.py`, `gui/update/update_progress_dialog.py`, `main.py`, `tests/test_update_helper.py`.
+
+## [v1.2.0] - 2026-05-16
+
+### Adicionado
+- **PDF Chamada** (`services/chamada_pdf.py`): alinhamento para impressão **frente e verso** — cada ala (a partir da 2ª) começa em **página ímpar**; se o `PageBreak` cair em página par, insere folha em branco antes do cabeçalho da ala (`_EnsureOddPageStart`).
+- Testes em `tests/test_chamada_pdf_odd_pages.py` para validar páginas ímpares de início por ala.
+
+### Alterado
+- Versão do aplicativo: **v1.2.0** (`config/config.py`).
+
+### Arquivos principais
+- `services/chamada_pdf.py`, `config/config.py`, `README.md`, `tests/test_chamada_pdf_odd_pages.py`.
+
 ## [v1.1.0] - 2026-05-08
 
 ### Adicionado

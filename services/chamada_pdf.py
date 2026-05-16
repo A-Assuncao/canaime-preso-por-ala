@@ -1,5 +1,10 @@
 """
 Geração do PDF da chamada por ala (A4, compacto para impressão P&B frente/verso).
+
+Impressão duplex: cada ala (exceto a primeira) começa em **página ímpar** (frente da folha).
+Se, após o ``PageBreak`` entre alas, a página atual for par, insere-se uma folha em branco
+(``_EnsureOddPageStart``) antes do cabeçalho da ala.
+
 Tabela por ala: cabeçalho só no início da ala (sem ``repeatRows``).
 Coluna Qtd fora do ``GRID``; ``BOX`` só na célula com número.
 Grade em Item–Observações; borda esquerda **externa** da tabela só nas linhas com Qtd preenchida
@@ -22,6 +27,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Table, TableStyle
+from reportlab.platypus.flowables import NullDraw
 
 from config.excel_config_control import calculate_shift
 from config.units_config import UNITS_CONFIG
@@ -108,6 +114,22 @@ def _sort_selected_wings(selected: Iterable[tuple[str, str]]) -> list[tuple[str,
     return sorted(set(selected), key=wing_key)
 
 
+class _EnsureOddPageStart(NullDraw):
+    """
+    Flowable invisível: após ``PageBreak`` entre alas, garante início em página ímpar.
+
+    Em frente/verso, a frente da folha é ímpar (1, 3, 5…). Se a página atual for par,
+    agenda um ``FrameBreak`` (folha em branco) antes do conteúdo da próxima ala.
+    """
+
+    def wrap(self, availWidth, availHeight):
+        if self.canv.getPageNumber() % 2 == 0:
+            from reportlab.platypus.doctemplate import FrameBreak
+
+            self._frame.add_generated_content(FrameBreak)
+        return (0, 0)
+
+
 def _ala_section_title(bloco: str, ala_id: str) -> str:
     try:
         name = UNITS_CONFIG[UNIT_KEY]["blocks"][bloco]["alas"][ala_id]["name"]
@@ -134,6 +156,7 @@ def build_chamada_pdf(
     Colunas da tabela: **Qtd** (só número na 1ª linha de cada cela), Item, Cela, Nome, Observações.
     Cabeçalho **uma vez por ala**. Qtd fora do ``GRID``; célula com número recebe ``BOX``; Qtd vazia sem bordas.
     Nas linhas com Qtd vazia, apaga-se só a borda esquerda **externa** da célula (0,r); a coluna Item mantém ``LINEBEFORE`` da grade.
+    Para impressão frente/verso, cada ala (a partir da 2ª) inicia em página ímpar; página par extra fica em branco.
 
     Returns:
         Número de alas com pelo menos um preso no PDF.
@@ -243,6 +266,7 @@ def build_chamada_pdf(
     for wi, wing in enumerate(wings_with_data):
         if wi > 0:
             story.append(PageBreak())
+            story.append(_EnsureOddPageStart())
 
         bloco, ala_id = wing
         story.append(Paragraph(_escape_xml(INSTITUTION_NAME), inst_style))

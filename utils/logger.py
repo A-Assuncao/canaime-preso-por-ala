@@ -78,6 +78,11 @@ class Logger:
             Logger._session_started = False
 
     @staticmethod
+    def _discord_enabled() -> bool:
+        url = (Logger.WEBHOOK_URL or "").strip()
+        return url.startswith("https://") or url.startswith("http://")
+
+    @staticmethod
     def capture_error(error: Exception):
         logger = Logger.get_logger()
         error_message = f"Erro capturado: {str(error)}"
@@ -89,14 +94,16 @@ class Logger:
         detailed_log = f'{error_message}\nTraceback:\n{traceback_message}\n\nInformações do Sistema:\n{system_info}'
         logger.error(detailed_log)
 
-        # Enviar para o Discord
-        Logger.send_to_discord(detailed_log)
+        if Logger._discord_enabled():
+            Logger.send_to_discord(detailed_log)
 
     @staticmethod
     def send_to_discord(message):
+        if not Logger._discord_enabled():
+            return
         try:
             data = {"content": f"Log de Erro:\n```{message}```"}
-            response = requests.post(Logger.WEBHOOK_URL, json=data)
+            response = requests.post(Logger.WEBHOOK_URL.strip(), json=data, timeout=10)
             if response.status_code == 204:
                 print("Log enviado com sucesso para o Discord.")
             else:
@@ -152,7 +159,7 @@ class Logger:
             from config.config import APP_VERSION
             return APP_VERSION
         except ImportError:
-            return "v1.0.0"
+            return "v1.4.0"
 
 if __name__ == "__main__":
     try:
